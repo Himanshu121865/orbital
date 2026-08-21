@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 
 export const EARTH_RADIUS = 1;
+export const EARTH_RADIUS_KM = 6371;
 
 export function createEarth(scene) {
   const loader = new THREE.TextureLoader();
