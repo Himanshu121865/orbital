@@ -2,9 +2,10 @@ import './styles.css';
 import * as THREE from 'three';
 import { createScene } from './scene.js';
 import { createEarth, createStarfield } from './earth.js';
+import { trackSatellite } from './satellites.js';
 
 const canvas = document.getElementById('scene');
-const { scene } = createScene(canvas);
+const { scene, onTick } = createScene(canvas);
 
 scene.add(new THREE.AmbientLight(0xffffff, 0.35));
 
@@ -14,3 +15,7 @@ scene.add(sunLight);
 
 createStarfield(scene);
 createEarth(scene);
+
+trackSatellite({ scene, onTick, noradId: 25544 }).then((sat) => {
+  console.log(`Tracking ${sat.name} (period: ${sat.periodMin.toFixed(1)} min)`);
+});
