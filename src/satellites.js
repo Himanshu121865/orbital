@@ -3,6 +3,7 @@ import { twoline2satrec, propagate, gstime, eciToGeodetic } from 'satellite.js';
 import { fetchTLE } from './tle.js';
 import { createOrbitLines } from './orbits.js';
 import { geodeticToVec3 } from './coords.js';
+import { loadModel } from './models.js';
 
 export async function trackSatellite({ scene, onTick, noradId }) {
   const { name, line1, line2 } = await fetchTLE(noradId);
@@ -15,6 +16,12 @@ export async function trackSatellite({ scene, onTick, noradId }) {
   );
   object.add(placeholder);
   scene.add(object);
+
+  loadModel(noradId).then((model) => {
+    if (!model) return;
+    object.remove(placeholder);
+    object.add(model);
+  });
 
   const orbit = createOrbitLines(satrec);
   scene.add(orbit.group);
