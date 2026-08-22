@@ -25,6 +25,25 @@ export function createDashboard() {
     ])
   );
 
+  const lockRow = document.createElement('div');
+  lockRow.id = 'lock-row';
+  lockRow.innerHTML =
+    '<span class="label">Camera</span>' +
+    '<button data-lock="earth" class="active">Earth</button>' +
+    '<button data-lock="satellite">Satellite</button>';
+  panel.appendChild(lockRow);
+
+  function onLockSelect(callback) {
+    lockRow.querySelectorAll('button').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        lockRow
+          .querySelectorAll('button')
+          .forEach((b) => b.classList.toggle('active', b === btn));
+        callback(btn.dataset.lock);
+      });
+    });
+  }
+
   function setName(name) {
     els.name.textContent = name;
   }
@@ -36,5 +55,5 @@ export function createDashboard() {
     els.vel.textContent = `${t.speedKmS.toFixed(2)} km/s`;
   }
 
-  return { panel, setName, update };
+  return { panel, setName, update, onLockSelect };
 }
