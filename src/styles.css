@@ -17,3 +17,42 @@ body {
   width: 100vw;
   height: 100vh;
 }
+
+#dashboard {
+  position: fixed;
+  top: 16px;
+  left: 16px;
+  z-index: 10;
+  min-width: 230px;
+  padding: 14px 18px;
+  background: rgba(10, 14, 20, 0.72);
+  border: 1px solid rgba(120, 180, 255, 0.25);
+  border-radius: 10px;
+  backdrop-filter: blur(8px);
+  color: #e8eef7;
+  font-family: system-ui, sans-serif;
+}
+
+#dashboard h2 {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin-bottom: 10px;
+  color: #8fd6ff;
+}
+
+#dashboard .row {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 3px 0;
+  font-size: 13px;
+}
+
+#dashboard .label {
+  color: #93a4bb;
+}
+
+#dashboard .row span:last-child {
+  font-variant-numeric: tabular-nums;
+}
