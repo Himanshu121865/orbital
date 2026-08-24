@@ -1,12 +1,14 @@
 const CACHE_KEY = 'orbital.tle.v1';
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
-const FALLBACK_TLE = {
-  name: 'ISS (ZARYA)',
-  line1:
-    '1 25544U 98067A   26232.75924728  .00009536  00000+0  17761-3 0  9996',
-  line2:
-    '2 25544  51.6330 340.5034 0007690  67.3286 292.8515 15.49535659581764',
+const FALLBACK_TLES = {
+  25544: {
+    name: 'ISS (ZARYA)',
+    line1:
+      '1 25544U 98067A   26232.75924728  .00009536  00000+0  17761-3 0  9996',
+    line2:
+      '2 25544  51.6330 340.5034 0007690  67.3286 292.8515 15.49535659581764',
+  },
 };
 
 function readCache(noradId) {
@@ -50,7 +52,9 @@ export async function fetchTLE(noradId) {
     writeCache(noradId, tle);
     return tle;
   } catch (err) {
+    const fallback = FALLBACK_TLES[noradId];
+    if (!fallback) throw err;
     console.warn(`TLE fetch failed (${err.message}), using offline fallback`);
-    return FALLBACK_TLE;
+    return fallback;
   }
 }

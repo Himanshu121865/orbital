@@ -3,6 +3,8 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 
 const MODEL_REGISTRY = {
   25544: { path: '/models/iss.glb', size: 0.06 },
+  20580: { path: '/models/hst.glb', size: 0.035 },
+  28424: { path: '/models/aqua.glb', size: 0.035 },
 };
 
 function prepare(model, targetSize) {

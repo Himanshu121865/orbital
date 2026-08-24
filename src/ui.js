@@ -11,6 +11,9 @@ export function createDashboard() {
   panel.id = 'dashboard';
   panel.innerHTML = `
     <h2 id="dash-name">Loading…</h2>
+    <div id="sat-select-wrap">
+      <select id="sat-select"></select>
+    </div>
     <div class="row"><span class="label">Latitude</span><span id="dash-lat">—</span></div>
     <div class="row"><span class="label">Longitude</span><span id="dash-lon">—</span></div>
     <div class="row"><span class="label">Altitude</span><span id="dash-alt">—</span></div>
@@ -25,6 +28,8 @@ export function createDashboard() {
     ])
   );
 
+  const select = panel.querySelector('#sat-select');
+
   const lockRow = document.createElement('div');
   lockRow.id = 'lock-row';
   lockRow.innerHTML =
@@ -32,6 +37,16 @@ export function createDashboard() {
     '<button data-lock="earth" class="active">Earth</button>' +
     '<button data-lock="satellite">Satellite</button>';
   panel.appendChild(lockRow);
+
+  function setOptions(sats) {
+    select.innerHTML = sats
+      .map((s) => `<option value="${s.noradId}">${s.name}</option>`)
+      .join('');
+  }
+
+  function onSelect(callback) {
+    select.addEventListener('change', () => callback(Number(select.value)));
+  }
 
   function onLockSelect(callback) {
     lockRow.querySelectorAll('button').forEach((btn) => {
@@ -55,5 +70,23 @@ export function createDashboard() {
     els.vel.textContent = `${t.speedKmS.toFixed(2)} km/s`;
   }
 
-  return { panel, setName, update, onLockSelect };
+  return { panel, setOptions, onSelect, onLockSelect, setName, update };
+}
+
+export function createLoader() {
+  const overlay = document.createElement('div');
+  overlay.id = 'loading';
+  overlay.innerHTML =
+    '<div class="spinner"></div><p id="loading-text">Fetching orbital data…</p>';
+  document.body.appendChild(overlay);
+
+  return {
+    setText(text) {
+      overlay.querySelector('#loading-text').textContent = text;
+    },
+    hide() {
+      overlay.classList.add('hidden');
+      setTimeout(() => overlay.remove(), 500);
+    },
+  };
 }

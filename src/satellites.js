@@ -45,5 +45,13 @@ export async function trackSatellite({ scene, onTick, noradId }) {
     if (t) object.position.copy(t.position);
   });
 
-  return { name, satrec, object, telemetryAt, periodMin: orbit.periodMin };
+  return {
+    noradId,
+    name,
+    satrec,
+    object,
+    telemetryAt,
+    periodMin: orbit.periodMin,
+    orbitGroup: orbit.group,
+  };
 }
