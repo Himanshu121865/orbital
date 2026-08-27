@@ -123,6 +123,7 @@ function selectSat(satObject) {
       untrackSatellite(scene, tracked);
       return;
     }
+    tracked.attach(scene, onTick);
     selectedTracked = tracked;
     const displayName = getFriendlyName(tracked.noradId) || tracked.name;
     dashboard.setName(displayName);

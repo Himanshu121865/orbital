@@ -28,19 +28,14 @@ export async function trackSatellite({
     new THREE.MeshBasicMaterial({ color: 0x00e5ff })
   );
   object.add(placeholder);
-  scene.add(object);
-
-  const loadedModels = [];
 
   loadModel(noradId).then((model) => {
     if (!model) return;
     object.remove(placeholder);
     object.add(model);
-    loadedModels.push(model);
   });
 
   const orbit = createOrbitLines(satrec);
-  scene.add(orbit.group);
 
   const dropGeometry = new THREE.BufferGeometry();
   dropGeometry.setAttribute(
@@ -53,7 +48,6 @@ export async function trackSatellite({
     opacity: 0.5,
   });
   const dropLine = new THREE.Line(dropGeometry, dropMaterial);
-  scene.add(dropLine);
 
   function telemetryAt(date) {
     const pv = propagate(satrec, date);
@@ -71,22 +65,31 @@ export async function trackSatellite({
 
   const groundPos = new THREE.Vector3();
 
-  onTick(() => {
-    const t = telemetryAt(new Date());
-    if (!t) return;
-    object.position.copy(t.position);
+  let tickHandle = null;
 
-    groundPos.copy(t.position).normalize();
+  function attach(sceneRef, onTickRef) {
+    sceneRef.add(object);
+    sceneRef.add(orbit.group);
+    sceneRef.add(dropLine);
 
-    const positions = dropLine.geometry.attributes.position.array;
-    positions[0] = t.position.x;
-    positions[1] = t.position.y;
-    positions[2] = t.position.z;
-    positions[3] = groundPos.x;
-    positions[4] = groundPos.y;
-    positions[5] = groundPos.z;
-    dropLine.geometry.attributes.position.needsUpdate = true;
-  });
+    tickHandle = () => {
+      const t = telemetryAt(new Date());
+      if (!t) return;
+      object.position.copy(t.position);
+
+      groundPos.copy(t.position).normalize();
+
+      const positions = dropLine.geometry.attributes.position.array;
+      positions[0] = t.position.x;
+      positions[1] = t.position.y;
+      positions[2] = t.position.z;
+      positions[3] = groundPos.x;
+      positions[4] = groundPos.y;
+      positions[5] = groundPos.z;
+      dropLine.geometry.attributes.position.needsUpdate = true;
+    };
+    onTickRef(tickHandle);
+  }
 
   return {
     noradId,
@@ -97,6 +100,7 @@ export async function trackSatellite({
     periodMin: orbit.periodMin,
     orbitGroup: orbit.group,
     dropLine,
+    attach,
   };
 }
 
