@@ -1,8 +1,8 @@
 import * as THREE from 'three';
 import { twoline2satrec, propagate, gstime } from 'satellite.js';
 import { fetchAllActive } from './tle.js';
+import { EARTH_RADIUS_KM } from './earth.js';
 
-const EARTH_RADIUS = 6371;
 const SATS_PER_FRAME = 4000;
 
 const CATEGORY_RULES = [
@@ -16,7 +16,8 @@ const CATEGORY_RULES = [
 
 function categorize(name, noradId) {
   for (const [cat, regex] of CATEGORY_RULES) {
-    if (regex.test(noradId) || regex.test(name)) return cat;
+    if (regex.test(name) || (cat === 'STATIONS' && regex.test(noradId)))
+      return cat;
   }
   return 'OTHER';
 }
@@ -25,9 +26,9 @@ function eciToThree(posEci, gmst) {
   const cosG = Math.cos(gmst);
   const sinG = Math.sin(gmst);
   return new THREE.Vector3(
-    (posEci.x * cosG + posEci.y * sinG) / EARTH_RADIUS,
-    posEci.z / EARTH_RADIUS,
-    (posEci.x * sinG - posEci.y * cosG) / EARTH_RADIUS
+    (posEci.x * cosG + posEci.y * sinG) / EARTH_RADIUS_KM,
+    posEci.z / EARTH_RADIUS_KM,
+    (posEci.x * sinG - posEci.y * cosG) / EARTH_RADIUS_KM
   );
 }
 
@@ -110,9 +111,16 @@ export async function createConstellation(scene, onTick) {
     currentIndex = limit >= constellation.length ? 0 : limit;
   });
 
+  function dispose() {
+    scene.remove(mesh);
+    geometry.dispose();
+    material.dispose();
+  }
+
   return {
     constellation,
     mesh,
+    dispose,
     setFilter(f) {
       activeFilter = f;
     },
