@@ -7,13 +7,16 @@ import { createDashboard, createLoader } from './ui.js';
 import { computeSunDirection, createSunSprite } from './sun.js';
 import { createMapOverlay } from './map.js';
 import { createConstellation } from './constellation.js';
+import { getFriendlyName } from './models.js';
 
 const canvas = document.getElementById('scene');
 const { scene, camera, controls, onTick } = createScene(canvas);
 
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.35);
+const ambientLight = new THREE.AmbientLight(0x222222);
 scene.add(ambientLight);
-const sunLight = new THREE.DirectionalLight(0xffffff, 2.2);
+const earthShine = new THREE.HemisphereLight(0x000000, 0x002244, 1.5);
+scene.add(earthShine);
+const sunLight = new THREE.DirectionalLight(0xffffff, 3.0);
 scene.add(sunLight);
 
 createStarfield(scene);
@@ -72,7 +75,8 @@ function selectSat(satObject) {
     satrec: satObject.satrec,
   }).then((tracked) => {
     selectedTracked = tracked;
-    dashboard.setName(tracked.name);
+    const displayName = getFriendlyName(tracked.noradId) || tracked.name;
+    dashboard.setName(displayName);
     mapOverlay.setSatrec(tracked.satrec);
 
     if (cameraLock === 'satellite') {
