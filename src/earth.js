@@ -13,41 +13,43 @@ export function createEarth(scene) {
   const nightMap = loader.load('/textures/earth_nightmap.jpg');
   nightMap.colorSpace = THREE.SRGBColorSpace;
 
+  const normalMap = loader.load('/textures/8k_earth_normal_map.jpg');
+  normalMap.anisotropy = 8;
+
+  const specularMap = loader.load('/textures/8k_earth_specular_map.jpg');
+  specularMap.anisotropy = 8;
+
   const geometry = new THREE.SphereGeometry(EARTH_RADIUS, 96, 96);
   const material = new THREE.MeshPhongMaterial({
     map: dayMap,
-    emissiveMap: nightMap,
-    emissive: new THREE.Color(0xffa040),
-    emissiveIntensity: 1.0,
-    specular: new THREE.Color(0x202020),
-    shininess: 12,
+    normalMap: normalMap,
+    normalScale: new THREE.Vector2(0.5, 0.5),
+    specularMap: specularMap,
+    specular: new THREE.Color('grey'),
+    shininess: 25,
   });
 
   material.onBeforeCompile = (shader) => {
+    shader.uniforms.tNight = { value: nightMap };
     shader.uniforms.sunDir = { value: new THREE.Vector3(1, 0, 0) };
 
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <common>',
-      '#include <common>\nvarying vec3 vWorldNormal;\n'
-    );
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <begin_vertex>',
-      '#include <begin_vertex>\nvWorldNormal = normalize(mat3(modelMatrix) * normal);\n'
-    );
-
     shader.fragmentShader = shader.fragmentShader.replace(
-      '#include <common>',
-      '#include <common>\nuniform vec3 sunDir;\nvarying vec3 vWorldNormal;\n'
+      '#include <map_pars_fragment>',
+      `#include <map_pars_fragment>
+      uniform sampler2D tNight;
+      uniform vec3 sunDir;`
     );
 
     shader.fragmentShader = shader.fragmentShader.replace(
       '#include <emissivemap_fragment>',
-      `#ifdef USE_EMISSIVEMAP
-        vec4 emissiveColor = texture2D(emissiveMap, vEmissiveMapUv);
-        float sunDot = dot(vWorldNormal, sunDir);
-        float nightFactor = smoothstep(0.15, -0.15, sunDot);
-        totalEmissiveRadiance = emissiveColor.rgb * nightFactor * 3.0;
-      #endif`
+      `#include <emissivemap_fragment>
+      float intensity = dot(vNormal, sunDir);
+      float nightMix = 1.0 - smoothstep(-0.2, 0.2, intensity);
+      vec4 nightColor = texture2D(tNight, vMapUv);
+      float luminance = dot(nightColor.rgb, vec3(0.299, 0.587, 0.114));
+      luminance = smoothstep(0.1, 0.5, luminance);
+      vec3 realisticLights = vec3(1.0, 0.75, 0.3) * luminance;
+      totalEmissiveRadiance += realisticLights * nightMix * 2.0;`
     );
 
     material.userData.shader = shader;
