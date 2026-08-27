@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
 
 export function createScene(canvas) {
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -16,12 +17,36 @@ export function createScene(canvas) {
   );
   camera.position.set(0, 1.2, 3);
 
-  const controls = new OrbitControls(camera, canvas);
-  controls.enableDamping = true;
-  controls.dampingFactor = 0.05;
-  controls.rotateSpeed = 0.5;
-  controls.minDistance = 1.15;
-  controls.maxDistance = 20;
+  const orbitControls = new OrbitControls(camera, canvas);
+  orbitControls.enableDamping = true;
+  orbitControls.dampingFactor = 0.05;
+  orbitControls.enablePan = false;
+  orbitControls.rotateSpeed = 0.5;
+  orbitControls.minDistance = 1.15;
+  orbitControls.maxDistance = 20;
+
+  const trackballControls = new TrackballControls(camera, canvas);
+  trackballControls.rotateSpeed = 4.0;
+  trackballControls.dynamicDampingFactor = 0.1;
+  trackballControls.minDistance = 0.002;
+  trackballControls.maxDistance = 10;
+  trackballControls.enabled = false;
+
+  function setSatelliteLock(enabled) {
+    if (enabled) {
+      orbitControls.enabled = false;
+      trackballControls.enabled = true;
+    } else {
+      trackballControls.enabled = false;
+      orbitControls.enabled = true;
+      camera.up.set(0, 1, 0);
+    }
+  }
+
+  function setControlsTarget(pos) {
+    orbitControls.target.copy(pos);
+    trackballControls.target.copy(pos);
+  }
 
   const tickHandlers = [];
   function onTick(fn) {
@@ -32,7 +57,8 @@ export function createScene(canvas) {
   renderer.setAnimationLoop(() => {
     const dt = clock.getDelta();
     for (const fn of tickHandlers) fn(dt);
-    controls.update();
+    orbitControls.update();
+    trackballControls.update();
     renderer.render(scene, camera);
   });
 
@@ -42,5 +68,14 @@ export function createScene(canvas) {
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  return { renderer, scene, camera, controls, onTick };
+  return {
+    renderer,
+    scene,
+    camera,
+    orbitControls,
+    trackballControls,
+    setSatelliteLock,
+    setControlsTarget,
+    onTick,
+  };
 }
