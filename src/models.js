@@ -17,6 +17,8 @@ const FRIENDLY_NAMES = {
   25994: 'TERRA',
 };
 
+const loader = new GLTFLoader();
+
 export function getFriendlyName(noradId) {
   return FRIENDLY_NAMES[noradId] || null;
 }
@@ -47,7 +49,7 @@ export function loadModel(noradId) {
   if (!entry || !entry.path) return Promise.resolve(null);
 
   return new Promise((resolve) => {
-    new GLTFLoader().load(
+    loader.load(
       entry.path,
       (gltf) => resolve(prepare(gltf.scene, entry.size)),
       undefined,
