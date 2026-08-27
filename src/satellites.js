@@ -5,9 +5,22 @@ import { createOrbitLines } from './orbits.js';
 import { geodeticToVec3 } from './coords.js';
 import { loadModel } from './models.js';
 
-export async function trackSatellite({ scene, onTick, noradId }) {
-  const { name, line1, line2 } = await fetchTLE(noradId);
-  const satrec = twoline2satrec(line1, line2);
+export async function trackSatellite({
+  scene,
+  onTick,
+  noradId,
+  name: providedName,
+  satrec: providedSatrec,
+}) {
+  let name, satrec;
+  if (providedSatrec) {
+    name = providedName || `NORAD ${noradId}`;
+    satrec = providedSatrec;
+  } else {
+    const tle = await fetchTLE(noradId);
+    name = tle.name;
+    satrec = twoline2satrec(tle.line1, tle.line2);
+  }
 
   const object = new THREE.Group();
   const placeholder = new THREE.Mesh(
@@ -54,4 +67,14 @@ export async function trackSatellite({ scene, onTick, noradId }) {
     periodMin: orbit.periodMin,
     orbitGroup: orbit.group,
   };
+}
+
+export function untrackSatellite(scene, tracked) {
+  if (!tracked) return;
+  scene.remove(tracked.object);
+  scene.remove(tracked.orbitGroup);
+  tracked.orbitGroup.traverse((child) => {
+    if (child.geometry) child.geometry.dispose();
+    if (child.material) child.material.dispose();
+  });
 }
