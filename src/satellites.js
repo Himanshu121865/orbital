@@ -30,10 +30,13 @@ export async function trackSatellite({
   object.add(placeholder);
   scene.add(object);
 
+  const loadedModels = [];
+
   loadModel(noradId).then((model) => {
     if (!model) return;
     object.remove(placeholder);
     object.add(model);
+    loadedModels.push(model);
   });
 
   const orbit = createOrbitLines(satrec);
@@ -73,8 +76,7 @@ export async function trackSatellite({
     if (!t) return;
     object.position.copy(t.position);
 
-    groundPos.copy(t.position);
-    groundPos.normalize().multiplyScalar(1.0);
+    groundPos.copy(t.position).normalize();
 
     const positions = dropLine.geometry.attributes.position.array;
     positions[0] = t.position.x;
@@ -98,15 +100,26 @@ export async function trackSatellite({
   };
 }
 
+function disposeObject(obj) {
+  obj.traverse((child) => {
+    if (child.geometry) child.geometry.dispose();
+    if (child.material) {
+      if (Array.isArray(child.material)) {
+        child.material.forEach((m) => m.dispose());
+      } else {
+        child.material.dispose();
+      }
+    }
+  });
+}
+
 export function untrackSatellite(scene, tracked) {
   if (!tracked) return;
   scene.remove(tracked.object);
   scene.remove(tracked.orbitGroup);
   scene.remove(tracked.dropLine);
-  tracked.orbitGroup.traverse((child) => {
-    if (child.geometry) child.geometry.dispose();
-    if (child.material) child.material.dispose();
-  });
+  disposeObject(tracked.orbitGroup);
+  disposeObject(tracked.object);
   tracked.dropLine.geometry.dispose();
   tracked.dropLine.material.dispose();
 }
