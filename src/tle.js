@@ -1,4 +1,3 @@
-const CACHE_KEY = 'orbital.tle.v1';
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 const FALLBACK_TLES = {
@@ -11,31 +10,39 @@ const FALLBACK_TLES = {
   },
 };
 
-function readCache(noradId) {
+function readBulkCache() {
   try {
-    const cache = JSON.parse(localStorage.getItem(CACHE_KEY)) || {};
-    const entry = cache[noradId];
-    if (entry && Date.now() - entry.fetchedAt < CACHE_TTL_MS) return entry.tle;
-  } catch {
-    return null;
-  }
+    const raw = localStorage.getItem('orbital.bulk.v1');
+    if (!raw) return null;
+    const { ts, text } = JSON.parse(raw);
+    if (Date.now() - ts < CACHE_TTL_MS) return text;
+  } catch {}
   return null;
 }
 
-function writeCache(noradId, tle) {
+function writeBulkCache(text) {
   try {
-    const cache = JSON.parse(localStorage.getItem(CACHE_KEY)) || {};
-    cache[noradId] = { fetchedAt: Date.now(), tle };
-    localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-  } catch {
-    return;
+    localStorage.setItem('orbital.bulk.v1', JSON.stringify({ ts: Date.now(), text }));
+  } catch {}
+}
+
+export async function fetchAllActive() {
+  const cached = readBulkCache();
+  if (cached) return cached;
+
+  const res = await fetch(
+    'https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=TLE'
+  );
+  if (!res.ok) throw new Error(`CelesTrak returned ${res.status}`);
+  const text = await res.text();
+  if (text.includes('<!DOCTYPE') || text.includes('Error')) {
+    throw new Error('Invalid CelesTrak response');
   }
+  writeBulkCache(text);
+  return text;
 }
 
 export async function fetchTLE(noradId) {
-  const cached = readCache(noradId);
-  if (cached) return cached;
-
   try {
     const res = await fetch(
       `https://celestrak.org/NORAD/elements/gp.php?CATNR=${noradId}&FORMAT=TLE`
@@ -44,13 +51,11 @@ export async function fetchTLE(noradId) {
     const text = (await res.text()).trim();
     const lines = text.split('\n');
     if (lines.length < 3) throw new Error('CelesTrak returned no data');
-    const tle = {
+    return {
       name: lines[0].trim(),
       line1: lines[1].trim(),
       line2: lines[2].trim(),
     };
-    writeCache(noradId, tle);
-    return tle;
   } catch (err) {
     const fallback = FALLBACK_TLES[noradId];
     if (!fallback) throw err;
