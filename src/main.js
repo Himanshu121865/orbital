@@ -48,6 +48,9 @@ createStarfield(scene);
 const { material: earthMaterial } = createEarth(scene, manager);
 const sunSprite = createSunSprite(scene);
 
+const UP = new THREE.Vector3(0, 1, 0);
+const NUDGE = new THREE.Vector3(0, 0.1, 0);
+
 const transition = {
   active: false,
   progress: 0,
@@ -79,6 +82,7 @@ const mapOverlay = createMapOverlay();
 let cameraLock = 'earth';
 let selectedSat = null;
 let selectedTracked = null;
+let trackingGeneration = 0;
 
 dashboard.onLockSelect((lock) => {
   cameraLock = lock;
@@ -106,6 +110,8 @@ function selectSat(satObject) {
   selectedSat = satObject;
   if (constellation) constellation.setActiveTarget(satObject);
 
+  const gen = ++trackingGeneration;
+
   trackSatellite({
     scene,
     onTick,
@@ -113,6 +119,10 @@ function selectSat(satObject) {
     name: satObject.name,
     satrec: satObject.satrec,
   }).then((tracked) => {
+    if (gen !== trackingGeneration) {
+      untrackSatellite(scene, tracked);
+      return;
+    }
     selectedTracked = tracked;
     const displayName = getFriendlyName(tracked.noradId) || tracked.name;
     dashboard.setName(displayName);
@@ -159,14 +169,17 @@ canvas.addEventListener('click', (event) => {
 let prevPos = null;
 let lastUpdate = 0;
 let lastMapUpdate = 0;
+const tempVec = new THREE.Vector3();
 
 onTick(() => {
   const now = performance.now();
   const date = new Date();
 
   const sunDir = computeSunDirection(date);
-  sunLight.position.copy(sunDir.clone().multiplyScalar(5));
-  sunSprite.position.copy(sunDir.clone().multiplyScalar(50));
+  tempVec.copy(sunDir).multiplyScalar(5);
+  sunLight.position.copy(tempVec);
+  tempVec.copy(sunDir).multiplyScalar(50);
+  sunSprite.position.copy(tempVec);
   if (earthMaterial.userData.shader) {
     earthMaterial.userData.shader.uniforms.sunDir.value.copy(sunDir);
   }
@@ -180,10 +193,6 @@ onTick(() => {
 
       transition.currentTarget.copy(transition.endTarget);
       camera.position.copy(transition.endPos);
-
-      if (!selectedTracked) {
-        camera.up.set(0, 1, 0);
-      }
 
       camera.lookAt(transition.currentTarget);
       setControlsTarget(transition.currentTarget);
@@ -202,7 +211,7 @@ onTick(() => {
       const targetDir = transition.endPos.clone().normalize();
 
       if (currentDir.dot(targetDir) < -0.99) {
-        currentDir.add(new THREE.Vector3(0, 0.1, 0)).normalize();
+        currentDir.add(NUDGE).normalize();
       }
 
       const angleDiff = currentDir.angleTo(targetDir);
@@ -216,9 +225,8 @@ onTick(() => {
 
       camera.position.copy(currentDir.multiplyScalar(newAlt));
 
-      if (!selectedTracked) {
-        const targetUp = new THREE.Vector3(0, 1, 0);
-        camera.up.lerp(targetUp, dynamicLerp);
+      if (cameraLock !== 'satellite') {
+        camera.up.lerp(UP, dynamicLerp);
       }
 
       camera.lookAt(transition.currentTarget);
