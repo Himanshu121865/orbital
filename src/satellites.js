@@ -39,6 +39,19 @@ export async function trackSatellite({
   const orbit = createOrbitLines(satrec);
   scene.add(orbit.group);
 
+  const dropGeometry = new THREE.BufferGeometry();
+  dropGeometry.setAttribute(
+    'position',
+    new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0], 3)
+  );
+  const dropMaterial = new THREE.LineBasicMaterial({
+    color: 0xaaaaaa,
+    transparent: true,
+    opacity: 0.5,
+  });
+  const dropLine = new THREE.Line(dropGeometry, dropMaterial);
+  scene.add(dropLine);
+
   function telemetryAt(date) {
     const pv = propagate(satrec, date);
     if (!pv.position) return null;
@@ -53,9 +66,24 @@ export async function trackSatellite({
     };
   }
 
+  const groundPos = new THREE.Vector3();
+
   onTick(() => {
     const t = telemetryAt(new Date());
-    if (t) object.position.copy(t.position);
+    if (!t) return;
+    object.position.copy(t.position);
+
+    groundPos.copy(t.position);
+    groundPos.normalize().multiplyScalar(1.0);
+
+    const positions = dropLine.geometry.attributes.position.array;
+    positions[0] = t.position.x;
+    positions[1] = t.position.y;
+    positions[2] = t.position.z;
+    positions[3] = groundPos.x;
+    positions[4] = groundPos.y;
+    positions[5] = groundPos.z;
+    dropLine.geometry.attributes.position.needsUpdate = true;
   });
 
   return {
@@ -66,6 +94,7 @@ export async function trackSatellite({
     telemetryAt,
     periodMin: orbit.periodMin,
     orbitGroup: orbit.group,
+    dropLine,
   };
 }
 
@@ -73,8 +102,11 @@ export function untrackSatellite(scene, tracked) {
   if (!tracked) return;
   scene.remove(tracked.object);
   scene.remove(tracked.orbitGroup);
+  scene.remove(tracked.dropLine);
   tracked.orbitGroup.traverse((child) => {
     if (child.geometry) child.geometry.dispose();
     if (child.material) child.material.dispose();
   });
+  tracked.dropLine.geometry.dispose();
+  tracked.dropLine.material.dispose();
 }
