@@ -97,7 +97,7 @@ function redraw() {
 
   drawGrid(ctx, w, h);
 
-  const periodMin = (2 * Math.PI) / currentSatrec.no;
+  const periodMin = 1440 / currentSatrec.no;
   const half = periodMin / 2;
 
   drawLine(ctx, sampleTrack(currentSatrec, -half, 0), '#ffd54f', false, w, h);

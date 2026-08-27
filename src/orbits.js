@@ -35,7 +35,7 @@ function makeLine(points, color, dashed) {
 
 export function createOrbitLines(satrec) {
   const group = new THREE.Group();
-  const periodMin = (2 * Math.PI) / satrec.no;
+  const periodMin = 1440 / satrec.no;
   const halfPeriod = periodMin / 2;
 
   group.add(makeLine(samplePath(satrec, -halfPeriod, 0), 0xffd54f, false));
