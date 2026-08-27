@@ -143,10 +143,17 @@ export function createDashboard(constellation) {
     els.vel.textContent = `${t.speedKmS.toFixed(2)} km/s`;
   }
 
+  function setLockButton(mode) {
+    camToggle.dataset.lock = mode;
+    camToggle.textContent =
+      mode === 'satellite' ? 'CAMERA LOCK: SATELLITE' : 'CAMERA LOCK: EARTH';
+  }
+
   return {
     panel,
     setName,
     update,
+    setLockButton,
     onSearchSelect(cb) {
       searchCallback = cb;
     },
