@@ -4,9 +4,27 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Orbital</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="/src/styles.css" />
   </head>
   <body>
+    <div id="loading-screen">
+      <div class="loader-content">
+        <div class="brand">
+          <div class="loader-dot"></div>
+          <h1>ORBITAL</h1>
+        </div>
+        <div class="loader-status">
+          <span id="loading-message">INITIALIZING...</span>
+          <span id="progress-text">0%</span>
+        </div>
+        <div class="progress-container">
+          <div id="progress-bar"></div>
+        </div>
+      </div>
+    </div>
     <canvas id="scene"></canvas>
     <script type="module" src="/src/main.js"></script>
   </body>

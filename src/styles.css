@@ -10,6 +10,8 @@ body {
   height: 100%;
   overflow: hidden;
   background: #000;
+  touch-action: none;
+  overscroll-behavior: none;
 }
 
 #scene {
@@ -27,6 +29,88 @@ body {
   --text-primary: #FFFFFF;
   --text-secondary: #94A3B8;
   --accent-blue: #38BDF8;
+  --font-sans: 'Inter', -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+}
+
+#loading-screen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--bg-base);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999999;
+  transition: opacity 0.8s ease;
+}
+
+#loading-screen.fade-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loader-content {
+  width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+}
+
+.loader-dot {
+  width: 10px;
+  height: 10px;
+  background: var(--accent-blue);
+  border-radius: 50%;
+  animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(0.95); opacity: 0.5; }
+  50% { transform: scale(1.2); opacity: 1; box-shadow: 0 0 12px var(--accent-blue); }
+  100% { transform: scale(0.95); opacity: 0.5; }
+}
+
+.brand h1 {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 3px;
+  color: var(--text-primary);
+}
+
+.loader-status {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+
+.progress-container {
+  width: 100%;
+  height: 2px;
+  background: var(--border-subtle);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+#progress-bar {
+  height: 100%;
+  width: 0%;
+  background: var(--accent-blue);
+  transition: none;
 }
 
 #dashboard {
@@ -43,7 +127,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
-  font-family: 'Inter', -apple-system, sans-serif;
+  font-family: var(--font-sans);
   color: var(--text-primary);
 }
 
@@ -84,7 +168,7 @@ select {
   border-radius: 4px;
   padding: 10px 12px;
   color: var(--text-primary);
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   outline: none;
   transition: all 0.2s ease;
@@ -94,6 +178,18 @@ input:focus,
 select:focus {
   border-color: var(--text-secondary);
   background: #1A2033;
+}
+
+.offline-banner {
+  background: rgba(220, 38, 38, 0.15);
+  border: 1px solid #dc2626;
+  color: #f87171;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  text-align: center;
+  letter-spacing: 0.5px;
 }
 
 .insights-bar {
@@ -112,7 +208,7 @@ select:focus {
 }
 
 .insights-bar .val {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 13px;
   font-weight: 700;
 }
@@ -161,7 +257,7 @@ select:focus {
 }
 
 .stat-card .val {
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 12px;
   margin-top: 4px;
 }
@@ -172,7 +268,7 @@ select:focus {
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
   padding: 10px;
-  font-family: 'Inter', sans-serif;
+  font-family: var(--font-sans);
   font-weight: 600;
   font-size: 12px;
   letter-spacing: 0.5px;
@@ -213,7 +309,7 @@ select:focus {
 
 .dropdown-item {
   padding: 10px 12px;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 11px;
   color: var(--text-primary);
   cursor: pointer;
@@ -237,46 +333,6 @@ select:focus {
 .custom-dropdown::-webkit-scrollbar-thumb {
   background: var(--border-hover);
   border-radius: 3px;
-}
-
-#loading {
-  position: fixed;
-  inset: 0;
-  z-index: 999999;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 18px;
-  background: var(--bg-base);
-  transition: opacity 0.8s ease;
-}
-
-#loading.hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.spinner {
-  width: 36px;
-  height: 36px;
-  border: 3px solid var(--border-subtle);
-  border-top-color: var(--accent-blue);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-#loading p {
-  color: var(--text-secondary);
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px;
-  letter-spacing: 0.5px;
 }
 
 #map-container {
