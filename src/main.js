@@ -2,12 +2,23 @@ import './styles.css';
 import * as THREE from 'three';
 import { createScene } from './scene.js';
 import { createEarth, createStarfield } from './earth.js';
-import { trackSatellite, untrackSatellite } from './satellites.js';
+import {
+  initModels,
+  showModel,
+  hideAllModels,
+  getFriendlyName,
+  drawTrajectory,
+  removeTrajectory,
+  initDropLine,
+  showDropLine,
+  hideDropLine,
+  updateDropLine,
+  telemetryAt,
+} from './satellites.js';
 import { createDashboard, createLoader } from './ui.js';
 import { computeSunDirection, createSunSprite } from './sun.js';
 import { createMapOverlay } from './map.js';
 import { createConstellation } from './constellation.js';
-import { getFriendlyName } from './models.js';
 
 const canvas = document.getElementById('scene');
 const { scene, camera, setSatelliteLock, setControlsTarget, onTick } =
@@ -48,6 +59,10 @@ createStarfield(scene);
 const { material: earthMaterial } = createEarth(scene, manager);
 const sunSprite = createSunSprite(scene);
 
+initModels(scene);
+initDropLine(scene);
+hideDropLine();
+
 const UP = new THREE.Vector3(0, 1, 0);
 const NUDGE = new THREE.Vector3(0, 0.1, 0);
 
@@ -80,14 +95,12 @@ if (!constellation) {
 const mapOverlay = createMapOverlay();
 
 let cameraLock = 'earth';
-let selectedSat = null;
-let selectedTracked = null;
-let trackingGeneration = 0;
+let activeTarget = null;
 
 dashboard.onLockSelect((lock) => {
   cameraLock = lock;
   if (lock === 'satellite') {
-    if (selectedSat) startTransition();
+    if (activeTarget) startTransition();
   } else {
     setSatelliteLock(false);
   }
@@ -98,54 +111,55 @@ dashboard.onFilterChange((filter) => {
 });
 
 dashboard.onSearchSelect((sat) => {
-  selectSat(sat);
+  changeActiveTarget(sat);
 });
 
-function selectSat(satObject) {
-  if (selectedTracked) {
-    untrackSatellite(scene, selectedTracked);
-    selectedTracked = null;
+function changeActiveTarget(satObject) {
+  if (!satObject) {
+    activeTarget = null;
+    removeTrajectory(scene);
+    hideDropLine();
+    hideAllModels();
+    dashboard.setName('NONE');
+    startTransition();
+    return;
   }
 
-  selectedSat = satObject;
+  activeTarget = satObject;
   if (constellation) constellation.setActiveTarget(satObject);
 
-  const gen = ++trackingGeneration;
+  const displayName = getFriendlyName(satObject.noradId) || satObject.name;
+  dashboard.setName(displayName);
+  drawTrajectory(scene, satObject.satrec);
+  showDropLine();
+  showModel(satObject.noradId);
+  mapOverlay.setSatrec(satObject.satrec);
 
-  trackSatellite({
-    scene,
-    onTick,
-    noradId: satObject.noradId,
-    name: satObject.name,
-    satrec: satObject.satrec,
-  }).then((tracked) => {
-    if (gen !== trackingGeneration) {
-      untrackSatellite(scene, tracked);
-      return;
-    }
-    tracked.attach(scene, onTick);
-    selectedTracked = tracked;
-    const displayName = getFriendlyName(tracked.noradId) || tracked.name;
-    dashboard.setName(displayName);
-    mapOverlay.setSatrec(tracked.satrec);
-
-    cameraLock = 'satellite';
-    dashboard.setLockButton('satellite');
-    startTransition();
-  });
+  cameraLock = 'satellite';
+  dashboard.setLockButton('satellite');
+  startTransition();
 }
 
 function startTransition() {
-  if (!selectedTracked) return;
+  if (!activeTarget) {
+    transition.startPos.copy(camera.position);
+    transition.startTarget.copy(transition.currentTarget);
+    transition.endPos.set(0, 1.2, 3);
+    transition.endTarget.set(0, 0, 0);
+    transition.progress = 0;
+    transition.active = true;
+    transition.currentDir.copy(camera.position).normalize();
+    return;
+  }
+
+  const satPos = telemetryAt(activeTarget.satrec, new Date())?.position;
+  if (!satPos) return;
 
   transition.startPos.copy(camera.position);
   transition.startTarget.copy(transition.currentTarget);
-
-  const satPos = selectedTracked.object.position;
   const earthToSat = satPos.clone().normalize();
   transition.endPos.copy(satPos).add(earthToSat.multiplyScalar(0.3));
   transition.endTarget.copy(satPos);
-
   transition.progress = 0;
   transition.active = true;
   transition.currentDir.copy(camera.position).normalize();
@@ -163,24 +177,23 @@ canvas.addEventListener('click', (event) => {
   if (intersects.length > 0) {
     const id = intersects[0].instanceId;
     const sat = constellation.constellation[id];
-    if (sat) selectSat(sat);
+    if (sat) changeActiveTarget(sat);
   }
 });
 
-let prevPos = null;
 let lastUpdate = 0;
 let lastMapUpdate = 0;
-const tempVec = new THREE.Vector3();
 
 onTick(() => {
   const now = performance.now();
   const date = new Date();
 
   const sunDir = computeSunDirection(date);
-  tempVec.copy(sunDir).multiplyScalar(5);
-  sunLight.position.copy(tempVec);
-  tempVec.copy(sunDir).multiplyScalar(50);
-  sunSprite.position.copy(tempVec);
+  const temp = new THREE.Vector3();
+  temp.copy(sunDir).multiplyScalar(5);
+  sunLight.position.copy(temp);
+  temp.copy(sunDir).multiplyScalar(50);
+  sunSprite.position.copy(temp);
   if (earthMaterial.userData.shader) {
     earthMaterial.userData.shader.uniforms.sunDir.value.copy(sunDir);
   }
@@ -194,6 +207,10 @@ onTick(() => {
 
       transition.currentTarget.copy(transition.endTarget);
       camera.position.copy(transition.endPos);
+
+      if (!activeTarget) {
+        camera.up.set(0, 1, 0);
+      }
 
       camera.lookAt(transition.currentTarget);
       setControlsTarget(transition.currentTarget);
@@ -232,29 +249,24 @@ onTick(() => {
 
       camera.lookAt(transition.currentTarget);
     }
-  } else if (cameraLock === 'satellite' && selectedTracked) {
-    const pos = selectedTracked.object.position;
-    if (!prevPos) {
-      transition.currentTarget.copy(pos);
-      setControlsTarget(pos);
-    } else {
-      const delta = pos.clone().sub(prevPos);
+  } else if (cameraLock === 'satellite' && activeTarget) {
+    const t = telemetryAt(activeTarget.satrec, date);
+    if (t) {
+      const delta = t.position.clone().sub(transition.currentTarget);
       transition.currentTarget.add(delta);
       camera.position.add(delta);
       setControlsTarget(transition.currentTarget);
+      updateDropLine(t.position);
     }
-    prevPos = pos.clone();
-  } else {
-    prevPos = null;
   }
 
-  if (selectedTracked && now - lastUpdate >= 200) {
+  if (activeTarget && now - lastUpdate >= 200) {
     lastUpdate = now;
-    const t = selectedTracked.telemetryAt(date);
+    const t = telemetryAt(activeTarget.satrec, date);
     if (t) dashboard.update(t);
   }
 
-  if (selectedTracked && now - lastMapUpdate >= 2000) {
+  if (activeTarget && now - lastMapUpdate >= 2000) {
     lastMapUpdate = now;
     mapOverlay.redraw();
   }
