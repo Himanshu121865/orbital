@@ -5,7 +5,21 @@ const MODEL_REGISTRY = {
   25544: { path: '/models/iss.glb', size: 0.06 },
   20580: { path: '/models/hst.glb', size: 0.035 },
   28424: { path: '/models/aqua.glb', size: 0.035 },
+  48274: { path: null, size: 0.035 },
+  25994: { path: '/models/terra.glb', size: 0.035 },
 };
+
+const FRIENDLY_NAMES = {
+  25544: 'ISS (ZARYA) — INTERNATIONAL SPACE STATION',
+  20580: 'HST — HUBBLE SPACE TELESCOPE',
+  48274: 'CSS (TIANHE) — TIANGONG SPACE STATION',
+  28424: 'AQUA',
+  25994: 'TERRA',
+};
+
+export function getFriendlyName(noradId) {
+  return FRIENDLY_NAMES[noradId] || null;
+}
 
 function prepare(model, targetSize) {
   const box = new THREE.Box3().setFromObject(model);
@@ -30,7 +44,7 @@ function prepare(model, targetSize) {
 
 export function loadModel(noradId) {
   const entry = MODEL_REGISTRY[noradId];
-  if (!entry) return Promise.resolve(null);
+  if (!entry || !entry.path) return Promise.resolve(null);
 
   return new Promise((resolve) => {
     new GLTFLoader().load(
