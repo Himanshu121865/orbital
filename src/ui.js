@@ -13,22 +13,25 @@ export function createDashboard(constellation) {
     <div class="panel-header">
       <h2 id="dash-name">ORBITAL</h2>
     </div>
-    <div class="input-group">
+    <div class="input-group search-group">
       <label>TARGET LOCK</label>
       <input type="text" id="sat-search" autocomplete="off" placeholder="SEARCH SATELLITE...">
       <div id="custom-dropdown" class="custom-dropdown hidden"></div>
+    </div>
+    <div id="offline-banner" class="offline-banner" style="display: none;">
+      API CONNECTION FAILED: PLEASE TRY AGAIN LATER
     </div>
     <div class="input-group">
       <label>FILTER</label>
       <select id="sat-filter">
         <option value="ALL">ALL SATELLITES</option>
-        <option value="STARLINK">STARLINK</option>
-        <option value="ONEWEB">ONEWEB</option>
+        <option value="STARLINK">STARLINK CONSTELLATION</option>
+        <option value="ONEWEB">ONEWEB CONSTELLATION</option>
         <option value="COMMS">COMMERCIAL COMMS</option>
         <option value="GPS">NAVIGATION (GPS/GLONASS)</option>
         <option value="WEATHER">EARTH OBS & WEATHER</option>
         <option value="STATIONS">SPACE STATIONS</option>
-        <option value="OTHER">OTHER</option>
+        <option value="OTHER">OTHER / MISCELLANEOUS</option>
       </select>
     </div>
     <div class="insights-bar">
@@ -61,6 +64,7 @@ export function createDashboard(constellation) {
   const filterSelect = panel.querySelector('#sat-filter');
   const insightCount = panel.querySelector('#insight-count');
   const camToggle = panel.querySelector('#cam-toggle');
+  const offlineBanner = panel.querySelector('#offline-banner');
 
   let activeFilter = 'ALL';
   let searchCallback = null;
@@ -149,11 +153,16 @@ export function createDashboard(constellation) {
       mode === 'satellite' ? 'CAMERA LOCK: SATELLITE' : 'CAMERA LOCK: EARTH';
   }
 
+  function showOfflineBanner() {
+    offlineBanner.style.display = 'block';
+  }
+
   return {
     panel,
     setName,
     update,
     setLockButton,
+    showOfflineBanner,
     onSearchSelect(cb) {
       searchCallback = cb;
     },
@@ -167,19 +176,33 @@ export function createDashboard(constellation) {
 }
 
 export function createLoader() {
-  const overlay = document.createElement('div');
-  overlay.id = 'loading';
-  overlay.innerHTML =
-    '<div class="spinner"></div><p id="loading-text">Fetching orbital data…</p>';
-  document.body.appendChild(overlay);
+  const screen = document.getElementById('loading-screen');
+  const message = document.getElementById('loading-message');
+  const progressText = document.getElementById('progress-text');
+  const progressBar = document.getElementById('progress-bar');
+
+  let highestProgress = 0;
 
   return {
-    setText(text) {
-      overlay.querySelector('#loading-text').textContent = text;
+    setProgress(loaded, total) {
+      const current = (loaded / total) * 100;
+      if (current > highestProgress) {
+        highestProgress = current;
+        progressBar.style.width = highestProgress + '%';
+        progressText.textContent = Math.floor(highestProgress) + '%';
+      }
+    },
+    setMessage(text) {
+      if (message) message.textContent = text;
     },
     hide() {
-      overlay.classList.add('hidden');
-      setTimeout(() => overlay.remove(), 500);
+      if (message) message.textContent = 'SYSTEM READY.';
+      setTimeout(() => {
+        screen.classList.add('fade-out');
+        setTimeout(() => {
+          screen.style.display = 'none';
+        }, 800);
+      }, 500);
     },
   };
 }

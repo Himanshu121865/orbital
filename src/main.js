@@ -13,6 +13,30 @@ const canvas = document.getElementById('scene');
 const { scene, camera, setSatelliteLock, setControlsTarget, onTick } =
   createScene(canvas);
 
+const loader = createLoader();
+
+const manager = new THREE.LoadingManager();
+let assetsLoaded = false;
+let dataLoaded = false;
+
+manager.onProgress = (_, loaded, total) => {
+  loader.setProgress(loaded, total);
+};
+
+manager.onLoad = () => {
+  assetsLoaded = true;
+  checkLoadStatus();
+};
+
+function checkLoadStatus() {
+  if (assetsLoaded && !dataLoaded) {
+    loader.setMessage('FETCHING TELEMETRY DATA...');
+  }
+  if (assetsLoaded && dataLoaded) {
+    loader.hide();
+  }
+}
+
 const ambientLight = new THREE.AmbientLight(0x222222);
 scene.add(ambientLight);
 const earthShine = new THREE.HemisphereLight(0x000000, 0x002244, 1.5);
@@ -21,7 +45,7 @@ const sunLight = new THREE.DirectionalLight(0xffffff, 3.0);
 scene.add(sunLight);
 
 createStarfield(scene);
-const { material: earthMaterial } = createEarth(scene);
+const { material: earthMaterial } = createEarth(scene, manager);
 const sunSprite = createSunSprite(scene);
 
 const transition = {
@@ -35,12 +59,21 @@ const transition = {
   currentDir: new THREE.Vector3(),
 };
 
-const loader = createLoader();
-
 const constellation = await createConstellation(scene, onTick);
+
+dataLoaded = true;
+if (assetsLoaded) {
+  checkLoadStatus();
+}
+
 const dashboard = createDashboard(
   constellation ? constellation.constellation : null
 );
+
+if (!constellation) {
+  dashboard.showOfflineBanner();
+}
+
 const mapOverlay = createMapOverlay();
 
 let cameraLock = 'earth';
@@ -217,5 +250,3 @@ onTick(() => {
     mapOverlay.redraw();
   }
 });
-
-loader.hide();

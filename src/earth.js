@@ -3,8 +3,8 @@ import * as THREE from 'three';
 export const EARTH_RADIUS = 1;
 export const EARTH_RADIUS_KM = 6371;
 
-export function createEarth(scene) {
-  const loader = new THREE.TextureLoader();
+export function createEarth(scene, manager) {
+  const loader = new THREE.TextureLoader(manager);
 
   const dayMap = loader.load('/textures/earth_daymap.jpg');
   dayMap.colorSpace = THREE.SRGBColorSpace;
