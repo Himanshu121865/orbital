@@ -18,7 +18,7 @@ export function createDashboard(constellation) {
       <input type="text" id="sat-search" autocomplete="off" placeholder="SEARCH SATELLITE...">
       <div id="custom-dropdown" class="custom-dropdown hidden"></div>
     </div>
-    <div id="offline-banner" class="offline-banner" style="display: none;">
+    <div id="offline-banner" class="offline-banner hidden">
       API CONNECTION FAILED: PLEASE TRY AGAIN LATER
     </div>
     <div class="input-group">
@@ -154,7 +154,7 @@ export function createDashboard(constellation) {
   }
 
   function showOfflineBanner() {
-    offlineBanner.style.display = 'block';
+    offlineBanner.classList.remove('hidden');
   }
 
   return {

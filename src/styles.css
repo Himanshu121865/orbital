@@ -192,6 +192,10 @@ select:focus {
   letter-spacing: 0.5px;
 }
 
+.offline-banner.hidden {
+  display: none;
+}
+
 .insights-bar {
   display: flex;
   justify-content: space-between;
