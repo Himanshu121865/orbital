@@ -5,6 +5,7 @@ import { createEarth, createStarfield } from './earth.js';
 import { trackSatellite } from './satellites.js';
 import { createDashboard, createLoader } from './ui.js';
 import { computeSunDirection, createSunSprite } from './sun.js';
+import { createMapOverlay } from './map.js';
 
 const NORAD_IDS = [25544, 20580, 28424, 25994, 48274];
 
@@ -29,6 +30,7 @@ const arc = { active: false, t: 0, duration: 1.8, startPos: new THREE.Vector3(),
 
 const dashboard = createDashboard();
 const loader = createLoader();
+const mapOverlay = createMapOverlay();
 
 dashboard.onLockSelect((lock) => {
   cameraLock = lock;
@@ -45,6 +47,7 @@ function selectSat(noradId) {
   selected = sats.find((s) => s.noradId === noradId);
   sats.forEach((s) => (s.orbitGroup.visible = s === selected));
   dashboard.setName(selected.name);
+  mapOverlay.setSatrec(selected.satrec);
   if (cameraLock === 'satellite') {
     startArcTransition();
   }
@@ -82,6 +85,7 @@ if (sats.length === 0) {
 
   let prevPos = null;
   let lastUpdate = 0;
+  let lastMapUpdate = 0;
 
   onTick(() => {
     const now = performance.now();
@@ -103,7 +107,6 @@ if (sats.length === 0) {
       }
       const t = easeInOutCubic(arc.t);
       camera.position.lerpVectors(arc.startPos, arc.endPos, t);
-      controls.target.copy(camera.position).normalize().multiplyScalar(0);
       controls.target.set(0, 0, 0);
     }
 
@@ -120,11 +123,16 @@ if (sats.length === 0) {
       prevPos = null;
     }
 
-    if (now - lastUpdate < 200) return;
-    lastUpdate = now;
+    if (now - lastUpdate >= 200) {
+      lastUpdate = now;
+      const t = selected.telemetryAt(date);
+      if (t) dashboard.update(t);
+    }
 
-    const t = selected.telemetryAt(date);
-    if (t) dashboard.update(t);
+    if (now - lastMapUpdate >= 2000) {
+      lastMapUpdate = now;
+      mapOverlay.redraw();
+    }
   });
 
   loader.hide();
