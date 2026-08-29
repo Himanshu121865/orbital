@@ -36,9 +36,13 @@ export function createScene(canvas) {
     if (enabled) {
       orbitControls.enabled = false;
       trackballControls.enabled = true;
+      orbitControls.minDistance = 0.15;
+      trackballControls.minDistance = 0.15;
     } else {
       trackballControls.enabled = false;
       orbitControls.enabled = true;
+      orbitControls.minDistance = 1.15;
+      trackballControls.minDistance = 0.15;
       camera.up.set(0, 1, 0);
     }
   }
@@ -46,6 +50,21 @@ export function createScene(canvas) {
   function setControlsTarget(pos) {
     orbitControls.target.copy(pos);
     trackballControls.target.copy(pos);
+  }
+
+  function setControlsEnabled(orbitEnabled, trackballEnabled) {
+    orbitControls.enabled = orbitEnabled;
+    trackballControls.enabled = trackballEnabled;
+  }
+
+  function setAdaptiveMinDistance(mode) {
+    if (mode === 'earth') {
+      orbitControls.minDistance = 1.15;
+      trackballControls.minDistance = 0.15;
+    } else {
+      orbitControls.minDistance = 0.15;
+      trackballControls.minDistance = 0.15;
+    }
   }
 
   const tickHandlers = [];
@@ -57,8 +76,8 @@ export function createScene(canvas) {
   renderer.setAnimationLoop(() => {
     const dt = clock.getDelta();
     for (const fn of tickHandlers) fn(dt);
-    orbitControls.update();
-    trackballControls.update();
+    if (orbitControls.enabled) orbitControls.update();
+    if (trackballControls.enabled) trackballControls.update();
     renderer.render(scene, camera);
   });
 
@@ -76,6 +95,8 @@ export function createScene(canvas) {
     trackballControls,
     setSatelliteLock,
     setControlsTarget,
+    setControlsEnabled,
+    setAdaptiveMinDistance,
     onTick,
   };
 }

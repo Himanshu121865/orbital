@@ -21,8 +21,17 @@ import { createMapOverlay } from './map.js';
 import { createConstellation } from './constellation.js';
 
 const canvas = document.getElementById('scene');
-const { scene, camera, setSatelliteLock, setControlsTarget, onTick } =
-  createScene(canvas);
+const {
+  scene,
+  camera,
+  orbitControls,
+  trackballControls,
+  setSatelliteLock,
+  setControlsTarget,
+  setControlsEnabled,
+  setAdaptiveMinDistance,
+  onTick,
+} = createScene(canvas);
 
 const loader = createLoader();
 
@@ -68,14 +77,20 @@ const NUDGE = new THREE.Vector3(0, 0.1, 0);
 
 const transition = {
   active: false,
-  progress: 0,
+  elapsed: 0,
+  duration: 1.25,
   startPos: new THREE.Vector3(),
   endPos: new THREE.Vector3(),
   startTarget: new THREE.Vector3(),
   endTarget: new THREE.Vector3(),
   currentTarget: new THREE.Vector3(0, 0, 0),
-  currentDir: new THREE.Vector3(),
+  startUp: new THREE.Vector3(0, 1, 0),
+  endUp: new THREE.Vector3(0, 1, 0),
 };
+
+function easeInOutCubic(x) {
+  return x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2;
+}
 
 const constellation = await createConstellation(scene, onTick);
 
@@ -144,25 +159,34 @@ function startTransition() {
   if (!activeTarget) {
     transition.startPos.copy(camera.position);
     transition.startTarget.copy(transition.currentTarget);
+    transition.startUp.copy(camera.up);
     transition.endPos.set(0, 1.2, 3);
     transition.endTarget.set(0, 0, 0);
-    transition.progress = 0;
+    transition.endUp.set(0, 1, 0);
+    transition.elapsed = 0;
     transition.active = true;
-    transition.currentDir.copy(camera.position).normalize();
+    setControlsEnabled(false, false);
+    setAdaptiveMinDistance('earth');
     return;
   }
 
   const satPos = telemetryAt(activeTarget.satrec, new Date())?.position;
   if (!satPos) return;
+  const t = telemetryAt(activeTarget.satrec, new Date());
+  const altKm = t ? t.altitudeKm : 400;
+  const offset = THREE.MathUtils.clamp(0.45 + altKm / 12000, 0.4, 0.85);
+  const earthToSat = satPos.clone().normalize();
 
   transition.startPos.copy(camera.position);
   transition.startTarget.copy(transition.currentTarget);
-  const earthToSat = satPos.clone().normalize();
-  transition.endPos.copy(satPos).add(earthToSat.multiplyScalar(0.3));
+  transition.startUp.copy(camera.up);
+  transition.endPos.copy(satPos).add(earthToSat.multiplyScalar(offset));
   transition.endTarget.copy(satPos);
-  transition.progress = 0;
+  transition.endUp.copy(transition.startUp).lerp(UP, 0.4).normalize();
+  transition.elapsed = 0;
   transition.active = true;
-  transition.currentDir.copy(camera.position).normalize();
+  setControlsEnabled(false, false);
+  setAdaptiveMinDistance('satellite');
 }
 
 const raycaster = new THREE.Raycaster();
@@ -183,71 +207,87 @@ canvas.addEventListener('click', (event) => {
 
 let lastUpdate = 0;
 let lastMapUpdate = 0;
+const sunTemp = new THREE.Vector3();
+const sDirTmp = new THREE.Vector3();
+const eDirTmp = new THREE.Vector3();
 
-onTick(() => {
+onTick((dt) => {
   const now = performance.now();
   const date = new Date();
 
   const sunDir = computeSunDirection(date);
-  const temp = new THREE.Vector3();
-  temp.copy(sunDir).multiplyScalar(5);
-  sunLight.position.copy(temp);
-  temp.copy(sunDir).multiplyScalar(50);
-  sunSprite.position.copy(temp);
+  sunTemp.copy(sunDir).multiplyScalar(5);
+  sunLight.position.copy(sunTemp);
+  sunTemp.copy(sunDir).multiplyScalar(50);
+  sunSprite.position.copy(sunTemp);
   if (earthMaterial.userData.shader) {
     earthMaterial.userData.shader.uniforms.sunDir.value.copy(sunDir);
   }
 
   if (transition.active) {
-    transition.progress += 0.025;
+    if (activeTarget) {
+      const livePos = telemetryAt(activeTarget.satrec, date)?.position;
+      if (livePos) {
+        transition.endTarget.copy(livePos);
+        const liveT = telemetryAt(activeTarget.satrec, date);
+        const liveAlt = liveT ? liveT.altitudeKm : 400;
+        const liveOffset = THREE.MathUtils.clamp(0.45 + liveAlt / 12000, 0.4, 0.85);
+        transition.endPos.copy(livePos).add(livePos.clone().normalize().multiplyScalar(liveOffset));
+      }
+    }
 
-    if (transition.progress >= 1.0) {
-      transition.progress = 1.0;
+    transition.elapsed += dt;
+    let t = Math.min(transition.elapsed / transition.duration, 1);
+    const eased = easeInOutCubic(t);
+
+    transition.currentTarget.lerpVectors(transition.startTarget, transition.endTarget, eased);
+
+    sDirTmp.copy(transition.startPos).normalize();
+    eDirTmp.copy(transition.endPos).normalize();
+    if (sDirTmp.dot(eDirTmp) < -0.99) {
+      sDirTmp.add(NUDGE).normalize();
+    }
+
+    let dir;
+    const angle = sDirTmp.angleTo(eDirTmp);
+    if (angle < 0.001) {
+      dir = eDirTmp.clone();
+    } else {
+      const q0 = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), sDirTmp);
+      const q1 = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 0, 1), eDirTmp);
+      const q = new THREE.Quaternion().slerpQuaternions(q0, q1, eased);
+      dir = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+    }
+
+    const sRad = transition.startPos.length();
+    const eRad = transition.endPos.length();
+    let radius = THREE.MathUtils.lerp(sRad, eRad, eased);
+    const arcBump = Math.sin(Math.PI * eased) * Math.max(0, (1 - sDirTmp.dot(eDirTmp)) * 0.6);
+    radius += arcBump;
+
+    camera.position.copy(dir.multiplyScalar(radius));
+    camera.up.lerpVectors(transition.startUp, transition.endUp, eased).normalize();
+    camera.lookAt(transition.currentTarget);
+    setControlsTarget(transition.currentTarget);
+
+    if (t >= 1) {
       transition.active = false;
-
       transition.currentTarget.copy(transition.endTarget);
       camera.position.copy(transition.endPos);
-
-      if (!activeTarget) {
-        camera.up.set(0, 1, 0);
-      }
-
+      camera.up.copy(transition.endUp);
       camera.lookAt(transition.currentTarget);
       setControlsTarget(transition.currentTarget);
-
-      if (cameraLock === 'satellite') {
+      if (!activeTarget) {
+        setControlsEnabled(false, false);
+        setSatelliteLock(false);
+      } else if (cameraLock === 'satellite') {
         setSatelliteLock(true);
+      } else {
+        setControlsEnabled(false, false);
+        setSatelliteLock(false);
       }
-    } else {
-      setSatelliteLock(false);
-
-      const dynamicLerp = 0.05 + Math.pow(transition.progress, 3) * 0.95;
-
-      transition.currentTarget.lerp(transition.endTarget, dynamicLerp);
-
-      const currentDir = camera.position.clone().normalize();
-      const targetDir = transition.endPos.clone().normalize();
-
-      if (currentDir.dot(targetDir) < -0.99) {
-        currentDir.add(NUDGE).normalize();
-      }
-
-      const angleDiff = currentDir.angleTo(targetDir);
-      currentDir.lerp(targetDir, dynamicLerp).normalize();
-
-      const baseAlt = transition.endPos.length();
-      const zoomBoost = angleDiff * 1.5;
-      const targetAlt = baseAlt + zoomBoost;
-      const currentAlt = camera.position.length();
-      const newAlt = THREE.MathUtils.lerp(currentAlt, targetAlt, dynamicLerp);
-
-      camera.position.copy(currentDir.multiplyScalar(newAlt));
-
-      if (cameraLock !== 'satellite') {
-        camera.up.lerp(UP, dynamicLerp);
-      }
-
-      camera.lookAt(transition.currentTarget);
+      orbitControls.update();
+      trackballControls.update();
     }
   } else if (cameraLock === 'satellite' && activeTarget) {
     const t = telemetryAt(activeTarget.satrec, date);

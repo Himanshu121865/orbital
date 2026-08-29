@@ -1,4 +1,8 @@
-const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+const CACHE_KEY = 'orbital.bulk.v1';
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6h fresh
+const STALE_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7d stale usable
+const RETRY_DELAY_MS = 5 * 60 * 1000; // 5m between retries after failure
+const FALLBACK_URL = '/fallback-active.tle';
 
 const FALLBACK_TLES = {
   25544: {
@@ -10,42 +14,151 @@ const FALLBACK_TLES = {
   },
 };
 
-function readBulkCache() {
+let pendingFetch = null;
+let lastFetchFailedAt = 0;
+
+function readCache() {
   try {
-    const raw = localStorage.getItem('orbital.bulk.v1');
+    const raw = localStorage.getItem(CACHE_KEY);
     if (!raw) return null;
-    const { ts, text } = JSON.parse(raw);
-    if (Date.now() - ts < CACHE_TTL_MS) return text;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed.ts !== 'number' || typeof parsed.text !== 'string')
+      return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+function isFresh(ts) {
+  return Date.now() - ts < CACHE_TTL_MS;
+}
+
+function isStale(ts) {
+  return Date.now() - ts < STALE_TTL_MS;
+}
+
+function writeCache(text) {
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), text }));
+  } catch (err) {
+    // Quota exceeded or storage unavailable - try to clear old cache and retry once
+    try {
+      localStorage.removeItem(CACHE_KEY);
+      localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), text }));
+    } catch {}
+    console.warn('TLE cache write failed:', err?.message);
+  }
+}
+
+async function fetchFallbackStatic() {
+  try {
+    const res = await fetch(FALLBACK_URL, { cache: 'force-cache' });
+    if (!res.ok) return null;
+    const text = await res.text();
+    if (text && text.includes('1 ') && text.includes('2 ')) return text;
   } catch {}
   return null;
 }
 
-function writeBulkCache(text) {
-  try {
-    localStorage.setItem('orbital.bulk.v1', JSON.stringify({ ts: Date.now(), text }));
-  } catch {}
+async function fetchAndCache() {
+  const urls = ['/api/celestrak', 'https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=TLE'];
+  let lastError = null;
+
+  for (const url of urls) {
+    try {
+      const res = await fetch(url, { cache: 'no-store' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const text = await res.text();
+      // Basic validation: must contain TLE lines and not be HTML error page
+      if (
+        !text ||
+        text.includes('<!DOCTYPE') ||
+        text.includes('<html') ||
+        text.includes('Error')
+      ) {
+        throw new Error('Invalid CelesTrak response (HTML/error)');
+      }
+      // Must contain at least one TLE pair
+      if (!text.includes('\n1 ') && !text.trim().startsWith('1 ')) {
+        throw new Error('Invalid TLE format');
+      }
+      writeCache(text);
+      return text;
+    } catch (err) {
+      lastError = err;
+      console.warn(`TLE fetch failed for ${url}:`, err.message);
+      // If rate limited (429), don't immediately try next url with same IP limit - but still try fallback proxy/direct
+      // Continue to next URL
+    }
+  }
+  throw lastError || new Error('All TLE fetch attempts failed');
 }
 
 export async function fetchAllActive() {
-  const cached = readBulkCache();
-  if (cached) return cached;
+  // Deduplicate concurrent calls
+  if (pendingFetch) return pendingFetch;
 
-  const res = await fetch(
-    'https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=TLE'
-  );
-  if (!res.ok) throw new Error(`CelesTrak returned ${res.status}`);
-  const text = await res.text();
-  if (text.includes('<!DOCTYPE') || text.includes('Error')) {
-    throw new Error('Invalid CelesTrak response');
+  const cached = readCache();
+
+  // Fresh cache -> return immediately, no network
+  if (cached && isFresh(cached.ts)) {
+    return cached.text;
   }
-  writeBulkCache(text);
-  return text;
+
+  // Stale cache exists -> return stale immediately, refresh in background (throttled)
+  if (cached && isStale(cached.ts)) {
+    if (Date.now() - lastFetchFailedAt > RETRY_DELAY_MS && !pendingFetch) {
+      pendingFetch = fetchAndCache()
+        .catch((err) => {
+          lastFetchFailedAt = Date.now();
+          console.warn('Background TLE refresh failed, keeping stale cache:', err.message);
+        })
+        .finally(() => {
+          pendingFetch = null;
+        });
+      // fire-and-forget, don't await
+    }
+    return cached.text;
+  }
+
+  // No usable cache (missing or expired beyond stale) -> must fetch, but deduplicate
+  const doFetch = async () => {
+    try {
+      const text = await fetchAndCache();
+      return text;
+    } catch (err) {
+      lastFetchFailedAt = Date.now();
+      // On failure, try to use any cached data even if expired beyond stale as last resort
+      if (cached) {
+        console.warn('Fetch failed, using expired cache as fallback:', err.message);
+        return cached.text;
+      }
+      // Try bundled static fallback
+      const fallback = await fetchFallbackStatic();
+      if (fallback) {
+        console.warn('Using bundled fallback TLE');
+        return fallback;
+      }
+      throw err;
+    }
+  };
+
+  pendingFetch = doFetch();
+  try {
+    const result = await pendingFetch;
+    return result;
+  } finally {
+    pendingFetch = null;
+  }
 }
 
 export async function fetchTLE(noradId) {
+  // Individual TLE fetches also respect the bulk cache first if available
   try {
     const res = await fetch(
-      `https://celestrak.org/NORAD/elements/gp.php?CATNR=${noradId}&FORMAT=TLE`
+      `https://celestrak.org/NORAD/elements/gp.php?CATNR=${noradId}&FORMAT=TLE`,
+      { cache: 'no-store' }
     );
     if (!res.ok) throw new Error(`CelesTrak returned ${res.status}`);
     const text = (await res.text()).trim();

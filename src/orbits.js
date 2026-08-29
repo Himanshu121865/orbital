@@ -10,7 +10,7 @@ function samplePath(satrec, startOffsetMin, endOffsetMin) {
   for (let t = startOffsetMin * 60; t <= endOffsetMin * 60; t += SAMPLE_INTERVAL_SEC) {
     const date = new Date(now + t * 1000);
     const pv = propagate(satrec, date);
-    if (!pv.position) continue;
+    if (!pv || !pv.position) continue;
     const gd = eciToGeodetic(pv.position, gstime(date));
     points.push(geodeticToVec3(gd.longitude, gd.latitude, gd.height));
   }
@@ -35,7 +35,7 @@ function makeLine(points, color, dashed) {
 
 export function createOrbitLines(satrec) {
   const group = new THREE.Group();
-  const periodMin = 1440 / satrec.no;
+  const periodMin = (2 * Math.PI) / satrec.no;
   const halfPeriod = periodMin / 2;
 
   group.add(makeLine(samplePath(satrec, -halfPeriod, 0), 0xffd54f, false));

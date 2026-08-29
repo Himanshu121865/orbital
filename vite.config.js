@@ -7,4 +7,13 @@ export default defineConfig({
   build: {
     target: 'es2022',
   },
+  server: {
+    proxy: {
+      '/api/celestrak': {
+        target: 'https://celestrak.org',
+        changeOrigin: true,
+        rewrite: () => '/NORAD/elements/gp.php?GROUP=active&FORMAT=TLE',
+      },
+    },
+  },
 });

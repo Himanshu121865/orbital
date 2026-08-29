@@ -3,8 +3,37 @@ import { propagate, gstime, eciToGeodetic } from 'satellite.js';
 let canvas, ctx, container;
 let expanded = false;
 let currentSatrec = null;
+let earthImage = null;
+let earthReady = false;
 
 const SAMPLE_SEC = 30;
+
+function ensureEarthImage() {
+  if (earthImage) return;
+  earthImage = new Image();
+  earthImage.src = '/textures/earth_daymap.jpg';
+  earthImage.onload = () => {
+    earthReady = true;
+    // trigger redraw if a sat is selected
+    if (currentSatrec) redraw();
+    else if (canvas) {
+      // draw earth even without sat for preview
+      syncSize();
+      const w = canvas.width;
+      const h = canvas.height;
+      if (w && h) {
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(earthImage, 0, 0, w, h);
+        ctx.fillStyle = 'rgba(10, 14, 20, 0.55)';
+        ctx.fillRect(0, 0, w, h);
+        drawGrid(ctx, w, h);
+      }
+    }
+  };
+  earthImage.onerror = () => {
+    earthReady = false;
+  };
+}
 
 function project(lonDeg, latDeg, w, h) {
   return [
@@ -19,7 +48,7 @@ function sampleTrack(satrec, startMin, endMin) {
   for (let t = startMin * 60; t <= endMin * 60; t += SAMPLE_SEC) {
     const date = new Date(now + t * 1000);
     const pv = propagate(satrec, date);
-    if (!pv.position) continue;
+    if (!pv || !pv.position) continue;
     const gd = eciToGeodetic(pv.position, gstime(date));
     points.push({
       lon: (gd.longitude * 180) / Math.PI,
@@ -86,18 +115,26 @@ function syncSize() {
 }
 
 function redraw() {
-  if (!canvas || !currentSatrec) return;
+  if (!canvas) return;
   syncSize();
   const w = canvas.width;
   const h = canvas.height;
 
   ctx.clearRect(0, 0, w, h);
-  ctx.fillStyle = 'rgba(10, 14, 20, 0.92)';
-  ctx.fillRect(0, 0, w, h);
+  if (earthReady) {
+    ctx.drawImage(earthImage, 0, 0, w, h);
+    ctx.fillStyle = 'rgba(10, 14, 20, 0.55)';
+    ctx.fillRect(0, 0, w, h);
+  } else {
+    ctx.fillStyle = 'rgba(10, 14, 20, 0.92)';
+    ctx.fillRect(0, 0, w, h);
+  }
 
   drawGrid(ctx, w, h);
 
-  const periodMin = 1440 / currentSatrec.no;
+  if (!currentSatrec) return;
+
+  const periodMin = (2 * Math.PI) / currentSatrec.no;
   const half = periodMin / 2;
 
   drawLine(ctx, sampleTrack(currentSatrec, -half, 0), '#ffd54f', false, w, h);
@@ -105,7 +142,7 @@ function redraw() {
 
   const now = new Date();
   const pv = propagate(currentSatrec, now);
-  if (pv.position) {
+  if (pv && pv.position) {
     const gd = eciToGeodetic(pv.position, gstime(now));
     const [x, y] = project(
       (gd.longitude * 180) / Math.PI,
@@ -147,7 +184,17 @@ export function createMapOverlay() {
   document.body.appendChild(container);
   ctx = canvas.getContext('2d');
 
+  ensureEarthImage();
   syncSize();
+  // initial background draw (earth + grid) even before sat selection
+  if (earthReady) {
+    const w = canvas.width;
+    const h = canvas.height;
+    ctx.drawImage(earthImage, 0, 0, w, h);
+    ctx.fillStyle = 'rgba(10, 14, 20, 0.55)';
+    ctx.fillRect(0, 0, w, h);
+    drawGrid(ctx, w, h);
+  }
 
   return { setSatrec, redraw };
 }

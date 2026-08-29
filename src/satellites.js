@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { propagate, gstime, eciToGeodetic, twoline2satrec } from 'satellite.js';
+import { propagate, gstime, eciToGeodetic } from 'satellite.js';
 import { geodeticToVec3 } from './coords.js';
 import { loadModel } from './models.js';
 
@@ -62,7 +62,7 @@ export function getFriendlyName(noradId) {
 
 function getSatellitePosition(satrec, date, fixedGmst = null) {
   const pv = propagate(satrec, date);
-  if (!pv.position || isNaN(pv.position.x)) return null;
+  if (!pv || !pv.position || isNaN(pv.position.x)) return null;
 
   const gmst = fixedGmst !== null ? fixedGmst : gstime(date);
   const cosG = Math.cos(gmst);
@@ -96,7 +96,7 @@ export function drawTrajectory(scene, satrec) {
   const futurePoints = [];
   const now = Date.now();
   const frozenGmst = gstime(new Date(now));
-  const periodMinutes = Math.ceil(1440 / satrec.no);
+  const periodMinutes = Math.ceil((2 * Math.PI) / satrec.no);
   const halfPeriod = Math.floor(periodMinutes / 2);
 
   for (let i = -halfPeriod; i <= 0; i++) {
@@ -174,7 +174,7 @@ export function updateDropLine(position) {
 
 export function telemetryAt(satrec, date) {
   const pv = propagate(satrec, date);
-  if (!pv.position) return null;
+  if (!pv || !pv.position) return null;
   const gd = eciToGeodetic(pv.position, gstime(date));
   const v = pv.velocity;
   return {
