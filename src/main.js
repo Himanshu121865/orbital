@@ -14,7 +14,11 @@ import {
   hideDropLine,
   updateDropLine,
   telemetryAt,
+  getSatellitePosition,
+  getActiveInertialPosition,
+  updateActiveModelPosition,
 } from './satellites.js';
+import { gstime } from 'satellite.js';
 import { createDashboard, createLoader } from './ui.js';
 import { computeSunDirection, createSunSprite } from './sun.js';
 import { createMapOverlay } from './map.js';
@@ -68,7 +72,7 @@ createStarfield(scene);
 const { material: earthMaterial } = createEarth(scene, manager);
 const sunSprite = createSunSprite(scene);
 
-initModels(scene);
+initModels(scene, manager);
 initDropLine(scene);
 hideDropLine();
 
@@ -145,9 +149,16 @@ function changeActiveTarget(satObject) {
 
   const displayName = getFriendlyName(satObject.noradId) || satObject.name;
   dashboard.setName(displayName);
-  drawTrajectory(scene, satObject.satrec);
+  const frozen = gstime(new Date());
+  drawTrajectory(scene, satObject.satrec, frozen);
   showDropLine();
   showModel(satObject.noradId);
+  // immediately place model and drop line on the frozen orbit
+  const initialPos = getSatellitePosition(satObject.satrec, new Date(), frozen);
+  if (initialPos) {
+    updateActiveModelPosition(new Date());
+    updateDropLine(initialPos);
+  }
   mapOverlay.setSatrec(satObject.satrec);
 
   cameraLock = 'satellite';
@@ -170,7 +181,7 @@ function startTransition() {
     return;
   }
 
-  const satPos = telemetryAt(activeTarget.satrec, new Date())?.position;
+  const satPos = getActiveInertialPosition(new Date()) || telemetryAt(activeTarget.satrec, new Date())?.position;
   if (!satPos) return;
   const t = telemetryAt(activeTarget.satrec, new Date());
   const altKm = t ? t.altitudeKm : 400;
@@ -190,12 +201,22 @@ function startTransition() {
 }
 
 const raycaster = new THREE.Raycaster();
+raycaster.params.Points.threshold = 0.1;
 const mouse = new THREE.Vector2();
-
+let pointerDownPos = null;
+canvas.addEventListener('pointerdown', (e) => {
+  pointerDownPos = { x: e.clientX, y: e.clientY };
+});
 canvas.addEventListener('click', (event) => {
   if (!constellation) return;
-  mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-  mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+  if (pointerDownPos) {
+    const dx = event.clientX - pointerDownPos.x;
+    const dy = event.clientY - pointerDownPos.y;
+    if (Math.hypot(dx, dy) > 5) return;
+  }
+  const rect = canvas.getBoundingClientRect();
+  mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+  mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
   raycaster.setFromCamera(mouse, camera);
   const intersects = raycaster.intersectObject(constellation.mesh);
   if (intersects.length > 0) {
@@ -221,12 +242,13 @@ onTick((dt) => {
   sunTemp.copy(sunDir).multiplyScalar(50);
   sunSprite.position.copy(sunTemp);
   if (earthMaterial.userData.shader) {
-    earthMaterial.userData.shader.uniforms.sunDir.value.copy(sunDir);
+    const viewSunDir = sunDir.clone().transformDirection(camera.matrixWorldInverse);
+    earthMaterial.userData.shader.uniforms.sunDir.value.copy(viewSunDir);
   }
 
   if (transition.active) {
     if (activeTarget) {
-      const livePos = telemetryAt(activeTarget.satrec, date)?.position;
+      const livePos = getActiveInertialPosition(date);
       if (livePos) {
         transition.endTarget.copy(livePos);
         const liveT = telemetryAt(activeTarget.satrec, date);
@@ -269,6 +291,11 @@ onTick((dt) => {
     camera.up.lerpVectors(transition.startUp, transition.endUp, eased).normalize();
     camera.lookAt(transition.currentTarget);
     setControlsTarget(transition.currentTarget);
+    if (activeTarget) {
+      updateActiveModelPosition(date);
+      const curPos = getActiveInertialPosition(date);
+      if (curPos) updateDropLine(curPos);
+    }
 
     if (t >= 1) {
       transition.active = false;
@@ -290,13 +317,14 @@ onTick((dt) => {
       trackballControls.update();
     }
   } else if (cameraLock === 'satellite' && activeTarget) {
-    const t = telemetryAt(activeTarget.satrec, date);
-    if (t) {
-      const delta = t.position.clone().sub(transition.currentTarget);
+    const inertialPos = getActiveInertialPosition(date);
+    if (inertialPos) {
+      const delta = inertialPos.clone().sub(transition.currentTarget);
       transition.currentTarget.add(delta);
       camera.position.add(delta);
       setControlsTarget(transition.currentTarget);
-      updateDropLine(t.position);
+      updateDropLine(inertialPos);
+      updateActiveModelPosition(date);
     }
   }
 

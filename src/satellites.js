@@ -6,14 +6,19 @@ import { loadModel } from './models.js';
 const loadedModels = {};
 const fallbackGeometry = new THREE.SphereGeometry(0.015, 16, 16);
 const fallbackMaterial = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+let activeModel = null;
+let activeNoradId = null;
+let activeFrozenGmst = null;
+let activeSatrecForModel = null;
 
-export function initModels(scene) {
+export function initModels(scene, manager) {
   const group = new THREE.Group();
   scene.add(group);
 
   const registry = {
     25544: { path: '/models/iss.glb', size: 0.06 },
     20580: { path: '/models/hst.glb', size: 0.035 },
+    27424: { path: '/models/aqua.glb', size: 0.035 },
     28424: { path: '/models/aqua.glb', size: 0.035 },
     48274: { path: null, size: 0.035 },
     25994: { path: '/models/terra.glb', size: 0.035 },
@@ -21,17 +26,32 @@ export function initModels(scene) {
 
   Object.entries(registry).forEach(([id, config]) => {
     if (!config.path) {
+      if (manager) manager.itemStart(`procedural-${id}`);
       const mesh = new THREE.Mesh(fallbackGeometry, fallbackMaterial);
       mesh.visible = false;
+      mesh.userData.noradId = String(id);
       group.add(mesh);
       loadedModels[id] = mesh;
+      if (manager) manager.itemEnd(`procedural-${id}`);
       return;
     }
-    loadModel(id).then((model) => {
+    loadModel(id, manager).then((model) => {
       if (!model) return;
       model.visible = false;
+      model.userData.noradId = String(id);
       group.add(model);
       loadedModels[id] = model;
+      if (String(id) === String(activeNoradId)) {
+        if (activeFrozenGmst !== null && activeSatrecForModel) {
+          const pos = getSatellitePosition(activeSatrecForModel, new Date(), activeFrozenGmst);
+          if (pos) {
+            model.position.copy(pos);
+            model.visible = true;
+          }
+        } else {
+          model.visible = true;
+        }
+      }
     });
   });
 
@@ -41,17 +61,27 @@ export function initModels(scene) {
 export function showModel(noradId) {
   Object.values(loadedModels).forEach((m) => (m.visible = false));
   const m = loadedModels[noradId];
-  if (m) m.visible = true;
+  activeModel = m || null;
+  activeNoradId = m ? String(noradId) : null;
+  if (m) {
+    m.visible = true;
+    m.userData.noradId = String(noradId);
+  }
 }
 
 export function hideAllModels() {
   Object.values(loadedModels).forEach((m) => (m.visible = false));
+  activeModel = null;
+  activeNoradId = null;
+  activeSatrecForModel = null;
+  activeFrozenGmst = null;
 }
 
 const FRIENDLY_NAMES = {
   25544: 'ISS (ZARYA) — INTERNATIONAL SPACE STATION',
   20580: 'HST — HUBBLE SPACE TELESCOPE',
   48274: 'CSS (TIANHE) — TIANGONG SPACE STATION',
+  27424: 'AQUA',
   28424: 'AQUA',
   25994: 'TERRA',
 };
@@ -60,7 +90,7 @@ export function getFriendlyName(noradId) {
   return FRIENDLY_NAMES[noradId] || null;
 }
 
-function getSatellitePosition(satrec, date, fixedGmst = null) {
+export function getSatellitePosition(satrec, date, fixedGmst = null) {
   const pv = propagate(satrec, date);
   if (!pv || !pv.position || isNaN(pv.position.x)) return null;
 
@@ -75,10 +105,21 @@ function getSatellitePosition(satrec, date, fixedGmst = null) {
   return new THREE.Vector3(x / R, z / R, -y / R);
 }
 
+export function getActiveInertialPosition(date) {
+  if (!activeSatrecForModel || activeFrozenGmst === null) return null;
+  return getSatellitePosition(activeSatrecForModel, date, activeFrozenGmst);
+}
+
+export function updateActiveModelPosition(date) {
+  if (!activeModel || !activeSatrecForModel || activeFrozenGmst === null) return;
+  const pos = getSatellitePosition(activeSatrecForModel, date, activeFrozenGmst);
+  if (pos) activeModel.position.copy(pos);
+}
+
 let orbitLine = null;
 let futureOrbitLine = null;
 
-export function drawTrajectory(scene, satrec) {
+export function drawTrajectory(scene, satrec, frozenGmst = null) {
   if (orbitLine) {
     scene.remove(orbitLine);
     orbitLine.geometry.dispose();
@@ -95,17 +136,19 @@ export function drawTrajectory(scene, satrec) {
   const pastPoints = [];
   const futurePoints = [];
   const now = Date.now();
-  const frozenGmst = gstime(new Date(now));
+  const frozen = frozenGmst !== null ? frozenGmst : gstime(new Date(now));
+  activeFrozenGmst = frozen;
+  activeSatrecForModel = satrec;
   const periodMinutes = Math.ceil((2 * Math.PI) / satrec.no);
   const halfPeriod = Math.floor(periodMinutes / 2);
 
   for (let i = -halfPeriod; i <= 0; i++) {
-    const pos = getSatellitePosition(satrec, new Date(now + i * 60000), frozenGmst);
+    const pos = getSatellitePosition(satrec, new Date(now + i * 60000), frozen);
     if (pos) pastPoints.push(pos);
   }
 
   for (let i = 0; i <= halfPeriod; i++) {
-    const pos = getSatellitePosition(satrec, new Date(now + i * 60000), frozenGmst);
+    const pos = getSatellitePosition(satrec, new Date(now + i * 60000), frozen);
     if (pos) futurePoints.push(pos);
   }
 

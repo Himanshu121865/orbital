@@ -28,8 +28,11 @@ export function computeSunDirection(date) {
   const JD = toJulianDate(date);
   const D = JD - 2451545.0;
 
-  const g = ((357.528 + 0.9856003 * D) % 360) * DEG2RAD;
-  const lambda = ((280.460 + 0.9856474 * D) % 360) * DEG2RAD;
+  const gDeg = ((357.528 + 0.9856003 * D) % 360);
+  const g = gDeg * DEG2RAD;
+  const L = (280.460 + 0.9856474 * D) % 360;
+  const lambdaDeg = L + 1.915 * Math.sin(g) + 0.02 * Math.sin(2 * g);
+  const lambda = lambdaDeg * DEG2RAD;
   const epsilon = (23.439 - 0.0000004 * D) * DEG2RAD;
 
   const alpha = Math.atan2(

@@ -70,9 +70,18 @@ export function createDashboard(constellation) {
   let searchCallback = null;
   let filterCallback = null;
 
+  function debounce(fn, delay) {
+    let timer = null;
+    return (...args) => {
+      clearTimeout(timer);
+      timer = setTimeout(() => fn(...args), delay);
+    };
+  }
+
   if (constellation) {
+    const debouncedPopulate = debounce((val) => populateDropdown(val), 150);
     searchInput.addEventListener('input', () => {
-      populateDropdown(searchInput.value);
+      debouncedPopulate(searchInput.value);
     });
     searchInput.addEventListener('focus', () => {
       populateDropdown(searchInput.value);

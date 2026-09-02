@@ -18,9 +18,7 @@ function ensureEarthImage() {
     if (currentSatrec) redraw();
     else if (canvas) {
       // draw earth even without sat for preview
-      syncSize();
-      const w = canvas.width;
-      const h = canvas.height;
+      const { w, h } = syncSize();
       if (w && h) {
         ctx.clearRect(0, 0, w, h);
         ctx.drawImage(earthImage, 0, 0, w, h);
@@ -106,19 +104,22 @@ function drawGrid(ctx, w, h) {
 
 function syncSize() {
   const rect = container.getBoundingClientRect();
-  const w = Math.floor(rect.width);
-  const h = Math.floor(rect.height);
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.floor(rect.width * dpr);
+  const h = Math.floor(rect.height * dpr);
   if (canvas.width !== w || canvas.height !== h) {
     canvas.width = w;
     canvas.height = h;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
   }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { w: rect.width, h: rect.height, dpr };
 }
 
 function redraw() {
   if (!canvas) return;
-  syncSize();
-  const w = canvas.width;
-  const h = canvas.height;
+  const { w, h } = syncSize();
 
   ctx.clearRect(0, 0, w, h);
   if (earthReady) {
@@ -185,11 +186,9 @@ export function createMapOverlay() {
   ctx = canvas.getContext('2d');
 
   ensureEarthImage();
-  syncSize();
+  const { w, h } = syncSize();
   // initial background draw (earth + grid) even before sat selection
-  if (earthReady) {
-    const w = canvas.width;
-    const h = canvas.height;
+  if (earthReady && w && h) {
     ctx.drawImage(earthImage, 0, 0, w, h);
     ctx.fillStyle = 'rgba(10, 14, 20, 0.55)';
     ctx.fillRect(0, 0, w, h);

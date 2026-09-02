@@ -1,9 +1,11 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
 const MODEL_REGISTRY = {
   25544: { path: '/models/iss.glb', size: 0.06 },
   20580: { path: '/models/hst.glb', size: 0.035 },
+  27424: { path: '/models/aqua.glb', size: 0.035 },
   28424: { path: '/models/aqua.glb', size: 0.035 },
   48274: { path: null, size: 0.035 },
   25994: { path: '/models/terra.glb', size: 0.035 },
@@ -13,11 +15,26 @@ const FRIENDLY_NAMES = {
   25544: 'ISS (ZARYA) — INTERNATIONAL SPACE STATION',
   20580: 'HST — HUBBLE SPACE TELESCOPE',
   48274: 'CSS (TIANHE) — TIANGONG SPACE STATION',
+  27424: 'AQUA',
   28424: 'AQUA',
   25994: 'TERRA',
 };
 
-const loader = new GLTFLoader();
+const gltfLoaders = new Map();
+
+function getGLTFLoader(manager) {
+  const key = manager ? manager.uuid : 'default';
+  if (!gltfLoaders.has(key)) {
+    const dracoLoader = new DRACOLoader(manager);
+    dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.7/');
+    const loader = new GLTFLoader(manager);
+    loader.setDRACOLoader(dracoLoader);
+    gltfLoaders.set(key, loader);
+  }
+  return gltfLoaders.get(key);
+}
+
+const fallbackLoader = new GLTFLoader();
 
 export function getFriendlyName(noradId) {
   return FRIENDLY_NAMES[noradId] || null;
@@ -44,10 +61,11 @@ function prepare(model, targetSize) {
   return model;
 }
 
-export function loadModel(noradId) {
+export function loadModel(noradId, manager) {
   const entry = MODEL_REGISTRY[noradId];
   if (!entry || !entry.path) return Promise.resolve(null);
 
+  const loader = manager ? getGLTFLoader(manager) : fallbackLoader;
   return new Promise((resolve) => {
     loader.load(
       entry.path,

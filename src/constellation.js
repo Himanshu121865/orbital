@@ -84,6 +84,7 @@ export async function createConstellation(scene, onTick) {
   let currentIndex = 0;
   let activeFilter = 'ALL';
   let activeTarget = null;
+  const MODEL_IDS = new Set(['25544', '20580', '27424', '28424', '48274', '25994']);
 
   onTick(() => {
     const now = new Date();
@@ -93,18 +94,41 @@ export async function createConstellation(scene, onTick) {
     for (let i = currentIndex; i < limit; i++) {
       const sat = constellation[i];
       const pv = propagate(sat.satrec, now);
-      if (!pv.position || isNaN(pv.position.x)) continue;
+      if (!pv || !pv.position || isNaN(pv.position.x)) {
+        dummy.scale.setScalar(0);
+        dummy.updateMatrix();
+        mesh.setMatrixAt(i, dummy.matrix);
+        continue;
+      }
 
       const pos = eciToThree(pv.position, gmst);
       dummy.position.copy(pos);
 
+      const activeHasModel = activeTarget && MODEL_IDS.has(activeTarget.noradId);
       const isHidden =
         (activeFilter !== 'ALL' && sat.category !== activeFilter) ||
-        (activeTarget && activeTarget.noradId === sat.noradId);
+        (activeHasModel && activeTarget.noradId === sat.noradId);
 
       dummy.scale.setScalar(isHidden ? 0 : 1);
       dummy.updateMatrix();
       mesh.setMatrixAt(i, dummy.matrix);
+    }
+
+    if (activeTarget) {
+      const activeHasModel = MODEL_IDS.has(activeTarget.noradId);
+      if (activeHasModel) {
+        const idx = constellation.indexOf(activeTarget);
+        if (idx !== -1 && (idx < currentIndex || idx >= limit)) {
+          const pv = propagate(activeTarget.satrec, now);
+          if (pv && pv.position && !isNaN(pv.position.x)) {
+            const pos = eciToThree(pv.position, gmst);
+            dummy.position.copy(pos);
+            dummy.scale.setScalar(0);
+            dummy.updateMatrix();
+            mesh.setMatrixAt(idx, dummy.matrix);
+          }
+        }
+      }
     }
 
     mesh.instanceMatrix.needsUpdate = true;
