@@ -140,6 +140,7 @@ function changeActiveTarget(satObject) {
     hideDropLine();
     hideAllModels();
     dashboard.setName('NONE');
+    mapOverlay.hide();
     startTransition();
     return;
   }
@@ -159,6 +160,7 @@ function changeActiveTarget(satObject) {
     updateActiveModelPosition(new Date());
     updateDropLine(initialPos);
   }
+  mapOverlay.show();
   mapOverlay.setSatrec(satObject.satrec);
 
   cameraLock = 'satellite';

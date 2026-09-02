@@ -106,15 +106,15 @@ function syncSize() {
   const rect = container.getBoundingClientRect();
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
   const w = Math.floor(rect.width * dpr);
-  const h = Math.floor(rect.height * dpr);
+  const h = Math.floor((rect.width / 2) * dpr);
   if (canvas.width !== w || canvas.height !== h) {
     canvas.width = w;
     canvas.height = h;
     canvas.style.width = rect.width + 'px';
-    canvas.style.height = rect.height + 'px';
+    canvas.style.height = (rect.width / 2) + 'px';
   }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: rect.width, h: rect.height, dpr };
+  return { w: rect.width, h: rect.width / 2, dpr };
 }
 
 function redraw() {
@@ -160,45 +160,90 @@ function redraw() {
 
 function toggleExpand() {
   expanded = !expanded;
-  container.classList.toggle('expanded', expanded);
   const btn = container.querySelector('#map-expand');
   btn.textContent = expanded ? '×' : '⤢';
-  setTimeout(() => {
-    syncSize();
-    redraw();
-  }, 320);
+
+  if (expanded) {
+    container.style.position = 'fixed';
+    container.style.top = '50%';
+    container.style.left = '50%';
+    container.style.transform = 'translate(-50%, -50%)';
+    container.style.width = '90vw';
+    container.style.maxWidth = '1200px';
+    container.style.maxHeight = '85vh';
+    container.style.aspectRatio = '2 / 1';
+    container.style.height = 'auto';
+    container.style.bottom = 'auto';
+    container.style.right = 'auto';
+    container.style.zIndex = '999999';
+    container.style.display = 'flex';
+    container.style.flexDirection = 'column';
+    canvas.style.objectFit = 'contain';
+    canvas.style.minHeight = '0';
+  } else {
+    const isMobile = window.matchMedia('(max-width:768px)').matches;
+    container.style.position = 'fixed';
+    container.style.top = 'auto';
+    container.style.bottom = isMobile ? '10px' : '20px';
+    container.style.right = '20px';
+    container.style.left = 'auto';
+    container.style.transform = 'none';
+    container.style.width = isMobile ? 'calc(100% - 40px)' : '320px';
+    container.style.maxWidth = isMobile ? 'none' : '320px';
+    container.style.maxHeight = 'none';
+    container.style.aspectRatio = 'auto';
+    container.style.height = 'auto';
+    container.style.zIndex = '100';
+    container.style.display = 'block';
+    canvas.style.objectFit = 'fill';
+    canvas.style.minHeight = 'auto';
+  }
+  void container.offsetHeight;
+  syncSize();
+  redraw();
 }
 
 export function createMapOverlay() {
   container = document.createElement('div');
   container.id = 'map-container';
+  container.style.display = 'none';
 
-  canvas = document.createElement('canvas');
-  container.appendChild(canvas);
+  const header = document.createElement('div');
+  header.className = 'map-header';
+  const title = document.createElement('span');
+  title.textContent = 'GROUND TRACK 2D';
+  header.appendChild(title);
 
   const btn = document.createElement('button');
   btn.id = 'map-expand';
   btn.textContent = '⤢';
   btn.addEventListener('click', toggleExpand);
-  container.appendChild(btn);
+  header.appendChild(btn);
+
+  container.appendChild(header);
+
+  canvas = document.createElement('canvas');
+  container.appendChild(canvas);
 
   document.body.appendChild(container);
   ctx = canvas.getContext('2d');
 
   ensureEarthImage();
-  const { w, h } = syncSize();
-  // initial background draw (earth + grid) even before sat selection
-  if (earthReady && w && h) {
-    ctx.drawImage(earthImage, 0, 0, w, h);
-    ctx.fillStyle = 'rgba(10, 14, 20, 0.55)';
-    ctx.fillRect(0, 0, w, h);
-    drawGrid(ctx, w, h);
-  }
 
-  return { setSatrec, redraw };
+  return { setSatrec, redraw, show, hide };
 }
 
 function setSatrec(satrec) {
   currentSatrec = satrec;
   redraw();
+}
+
+function show() {
+  container.style.display = expanded ? 'flex' : 'block';
+  syncSize();
+  redraw();
+}
+
+function hide() {
+  container.style.display = 'none';
 }

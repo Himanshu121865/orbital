@@ -350,27 +350,28 @@ select:focus {
   overflow: hidden;
   box-shadow: 0 12px 32px rgba(0, 0, 0, 0.6);
   z-index: 100;
-  transition: all 0.3s ease;
+}
+
+.map-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-secondary);
 }
 
 #map-container canvas {
   display: block;
   width: 100%;
   height: auto;
-}
-
-#map-container.expanded {
-  bottom: 5vh;
-  right: auto;
-  left: 10vw;
-  width: 80vw;
-  max-width: 1200px;
+  aspect-ratio: 2 / 1;
 }
 
 #map-expand {
-  position: absolute;
-  top: 6px;
-  right: 6px;
   background: var(--bg-panel);
   border: 1px solid var(--border-subtle);
   color: var(--text-primary);
