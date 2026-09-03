@@ -14,10 +14,8 @@ function ensureEarthImage() {
   earthImage.src = '/textures/earth_daymap.jpg';
   earthImage.onload = () => {
     earthReady = true;
-    // trigger redraw if a sat is selected
     if (currentSatrec) redraw();
     else if (canvas) {
-      // draw earth even without sat for preview
       const { w, h } = syncSize();
       if (w && h) {
         ctx.clearRect(0, 0, w, h);

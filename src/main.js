@@ -154,7 +154,6 @@ function changeActiveTarget(satObject) {
   drawTrajectory(scene, satObject.satrec, frozen);
   showDropLine();
   showModel(satObject.noradId);
-  // immediately place model and drop line on the frozen orbit
   const initialPos = getSatellitePosition(satObject.satrec, new Date(), frozen);
   if (initialPos) {
     updateActiveModelPosition(new Date());
