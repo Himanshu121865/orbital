@@ -46,7 +46,7 @@ export function createEarth(scene, manager) {
       float intensity = dot(vNormal, sunDir);
       float nightMix = 1.0 - smoothstep(-0.2, 0.2, intensity);
       vec4 nightColor = texture2D(tNight, vMapUv);
-      float luminance = dot(nightColor.rgb, vec3(0.299, 0.587, 0.114));
+      float luminance = dot(nightColor.rgb, vec3(0.299, 0.587, 0.114)); // rec.601 luma
       luminance = smoothstep(0.1, 0.5, luminance);
       vec3 realisticLights = vec3(1.0, 0.75, 0.3) * luminance;
       totalEmissiveRadiance += realisticLights * nightMix * 2.0;`

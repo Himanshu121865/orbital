@@ -63,6 +63,7 @@ function checkLoadStatus() {
 
 const ambientLight = new THREE.AmbientLight(0x222222);
 scene.add(ambientLight);
+// faint blue bounce from the planet so the night side isn't pitch black
 const earthShine = new THREE.HemisphereLight(0x000000, 0x002244, 1.5);
 scene.add(earthShine);
 const sunLight = new THREE.DirectionalLight(0xffffff, 3.0);
@@ -210,6 +211,7 @@ canvas.addEventListener('pointerdown', (e) => {
 });
 canvas.addEventListener('click', (event) => {
   if (!constellation) return;
+  // ignore clicks that were actually drags (orbiting the camera)
   if (pointerDownPos) {
     const dx = event.clientX - pointerDownPos.x;
     const dy = event.clientY - pointerDownPos.y;
@@ -255,6 +257,7 @@ onTick((dt) => {
         const liveT = telemetryAt(activeTarget.satrec, date);
         const liveAlt = liveT ? liveT.altitudeKm : 400;
         const liveOffset = THREE.MathUtils.clamp(0.45 + liveAlt / 12000, 0.4, 0.85);
+        // keep chasing the sat while it moves during the flight over
         transition.endPos.copy(livePos).add(livePos.clone().normalize().multiplyScalar(liveOffset));
       }
     }
@@ -267,6 +270,7 @@ onTick((dt) => {
 
     sDirTmp.copy(transition.startPos).normalize();
     eDirTmp.copy(transition.endPos).normalize();
+    // antipodal directions make the slerp flip, nudge slightly off-axis
     if (sDirTmp.dot(eDirTmp) < -0.99) {
       sDirTmp.add(NUDGE).normalize();
     }

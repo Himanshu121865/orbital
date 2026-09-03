@@ -84,6 +84,7 @@ export async function createConstellation(scene, onTick) {
   let currentIndex = 0;
   let activeFilter = 'ALL';
   let activeTarget = null;
+  // satellites that get a real 3D model instead of a dot (we hide their instance)
   const MODEL_IDS = new Set(['25544', '20580', '27424', '28424', '48274', '25994']);
 
   onTick(() => {
@@ -91,6 +92,8 @@ export async function createConstellation(scene, onTick) {
     const gmst = gstime(now);
     const limit = Math.min(currentIndex + SATS_PER_FRAME, constellation.length);
 
+    // sgp4 for every sat each frame is way too slow, so we chew through the
+    // list a few thousand at a time and wrap around
     for (let i = currentIndex; i < limit; i++) {
       const sat = constellation[i];
       const pv = propagate(sat.satrec, now);

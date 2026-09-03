@@ -196,6 +196,7 @@ function toggleExpand() {
     canvas.style.objectFit = 'fill';
     canvas.style.minHeight = 'auto';
   }
+  // force a reflow so the canvas picks up its new size before we redraw
   void container.offsetHeight;
   syncSize();
   redraw();

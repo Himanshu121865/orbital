@@ -42,6 +42,7 @@ function writeCache(text) {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), text }));
   } catch (err) {
+    // usually means we blew through the storage quota, drop the old entry and retry
     try {
       localStorage.removeItem(CACHE_KEY);
       localStorage.setItem(CACHE_KEY, JSON.stringify({ ts: Date.now(), text }));

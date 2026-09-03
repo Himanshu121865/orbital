@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { propagate, gstime, eciToGeodetic } from 'satellite.js';
 import { geodeticToVec3 } from './coords.js';
-import { loadModel } from './models.js';
+import { loadModel, getFriendlyName, MODEL_REGISTRY } from './models.js';
+import { EARTH_RADIUS_KM } from './earth.js';
 
 const loadedModels = {};
 const fallbackGeometry = new THREE.SphereGeometry(0.015, 16, 16);
@@ -15,14 +16,7 @@ export function initModels(scene, manager) {
   const group = new THREE.Group();
   scene.add(group);
 
-  const registry = {
-    25544: { path: '/models/iss.glb', size: 0.06 },
-    20580: { path: '/models/hst.glb', size: 0.035 },
-    27424: { path: '/models/aqua.glb', size: 0.035 },
-    28424: { path: '/models/aqua.glb', size: 0.035 },
-    48274: { path: null, size: 0.035 },
-    25994: { path: '/models/terra.glb', size: 0.035 },
-  };
+  const registry = MODEL_REGISTRY;
 
   Object.entries(registry).forEach(([id, config]) => {
     if (!config.path) {
@@ -77,18 +71,8 @@ export function hideAllModels() {
   activeFrozenGmst = null;
 }
 
-const FRIENDLY_NAMES = {
-  25544: 'ISS (ZARYA) — INTERNATIONAL SPACE STATION',
-  20580: 'HST — HUBBLE SPACE TELESCOPE',
-  48274: 'CSS (TIANHE) — TIANGONG SPACE STATION',
-  27424: 'AQUA',
-  28424: 'AQUA',
-  25994: 'TERRA',
-};
-
-export function getFriendlyName(noradId) {
-  return FRIENDLY_NAMES[noradId] || null;
-}
+// re-exported here since most callers already import from satellites.js
+export { getFriendlyName };
 
 export function getSatellitePosition(satrec, date, fixedGmst = null) {
   const pv = propagate(satrec, date);
@@ -101,8 +85,9 @@ export function getSatellitePosition(satrec, date, fixedGmst = null) {
   const y = -pv.position.x * sinG + pv.position.y * cosG;
   const z = pv.position.z;
 
-  const R = 6371;
-  return new THREE.Vector3(x / R, z / R, -y / R);
+  // satellite.js gives us ECI coords (z = north pole), we want three's y-up frame
+  const r = EARTH_RADIUS_KM;
+  return new THREE.Vector3(x / r, z / r, -y / r);
 }
 
 export function getActiveInertialPosition(date) {
@@ -136,6 +121,7 @@ export function drawTrajectory(scene, satrec, frozenGmst = null) {
   const pastPoints = [];
   const futurePoints = [];
   const now = Date.now();
+  // snapshot gmst once so the whole path stays rigid while the earth rotates underneath
   const frozen = frozenGmst !== null ? frozenGmst : gstime(new Date(now));
   activeFrozenGmst = frozen;
   activeSatrecForModel = satrec;
@@ -184,6 +170,7 @@ let dropLine = null;
 
 export function initDropLine(scene) {
   const geom = new THREE.BufferGeometry();
+  // two points, updated in place every frame
   geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
   dropLine = new THREE.Line(
     geom,

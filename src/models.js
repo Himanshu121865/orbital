@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 
-const MODEL_REGISTRY = {
+// Norad IDs we have 3D models for (48274 = Tiangong, no model yet, falls back to a sphere)
+export const MODEL_REGISTRY = {
   25544: { path: '/models/iss.glb', size: 0.06 },
   20580: { path: '/models/hst.glb', size: 0.035 },
   27424: { path: '/models/aqua.glb', size: 0.035 },
@@ -11,6 +12,7 @@ const MODEL_REGISTRY = {
   25994: { path: '/models/terra.glb', size: 0.035 },
 };
 
+// pretty display names for the handful of satellites we can show a real model for
 const FRIENDLY_NAMES = {
   25544: 'ISS (ZARYA) — INTERNATIONAL SPACE STATION',
   20580: 'HST — HUBBLE SPACE TELESCOPE',
@@ -40,6 +42,7 @@ export function getFriendlyName(noradId) {
   return FRIENDLY_NAMES[noradId] || null;
 }
 
+// normalizes scale/origin and swaps in a uniform metal-ish material
 function prepare(model, targetSize) {
   const box = new THREE.Box3().setFromObject(model);
   const size = box.getSize(new THREE.Vector3());
