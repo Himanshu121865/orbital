@@ -45,11 +45,3 @@ npm run dev
 Then open http://localhost:5173
 
 Earth textures from [Solar System Scope](https://www.solarsystemscope.com/textures/) (CC BY 4.0).
-
-## A few implementation notes
-
-* Positions are propagated with SGP4 in the ECI frame, then rotated by GMST into a fixed three.js scene (y-up, earth at the origin). One scene unit = 6371 km.
-* Orbit paths and the 2D ground track are frozen at the GMST of the moment you lock a target, so the path stays rigid relative to the satellite instead of smearing as the earth rotates underneath it.
-* Propagating 16,000+ satellites every frame is too expensive, so the constellation loop updates a few thousand instances per frame and wraps around.
-* TLE data is cached in localStorage for 6 hours. After that the app serves stale data for up to 7 days while it refreshes in the background, and falls back to a bundled TLE file if the network is completely unavailable.
-* Camera flights slerp between the start and end directions (with a small nudge when they're antipodal) and add a bit of arc to the radius so the camera swings around the planet instead of clipping through it.
