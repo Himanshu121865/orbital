@@ -5,6 +5,10 @@ atleast look at the time i have invested
 
 can u explain if i had written it by hand how it endup 50+ hours if u want me to show u my hackatime wait why do i just show you
 
+and as for the readme this was written by ai and it was around 160 lines.
+i have read it and keep the part which i like 
+so i wont call it fully ai written
+
 ![proof](public/proof/Screenshot-from-2026-09-03-21-37-25.png)
 
 # Orbital
