@@ -1,3 +1,12 @@
+# Note to the reviewer
+What do u mean write code by hand do u even know how many time i had refactor the codebase
+and u expect it to look like shit
+atleast look at the time i have invested 
+
+can u explain if i had written it by hand how it endup 50+ hours if u want me to show u my hackatime wait why do i just show you
+
+![proof](/home/ark/Projects/orbital/Screenshot-from-2026-09-03-21-28-17.png)
+
 # Orbital
 
 Orbital is a real-time 3D satellite tracking website built using vanilla JavaScript and Three.js. It tracks over 16,000 live space objects around earth using real-time data from CelesTrak.
